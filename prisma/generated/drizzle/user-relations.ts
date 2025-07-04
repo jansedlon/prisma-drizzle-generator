@@ -18,7 +18,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   }),
   referrals: many(user),
   profile: one(userProfile),
-  userSettings: one(userSettings),
+  settings: one(userSettings),
   posts: many(post),
   comments: many(comment),
   likes: many(like),
@@ -26,6 +26,6 @@ export const userRelations = relations(user, ({ one, many }) => ({
   assignedTasks: many(task),
   memberships: many(teamMember),
   friendships: many(friendship),
-  followedTags: many(tag),
-  followers: many(tag)
+  friendOf: many(friendship),
+  followedTags: many(tag)
 }));

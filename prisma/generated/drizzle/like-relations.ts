@@ -5,7 +5,6 @@ import { post } from './post-schema.js';
 import { comment } from './comment-schema.js';
 
 export const likeRelations = relations(like, ({ one, many }) => ({
-  likes: many(user),
   user: one(user, {
     fields: [like.userId],
     references: [user.id]

@@ -260,8 +260,8 @@ export class SchemaParser {
 
   private parseRelations(models: DMMF.Model[]): DrizzleRelation[] {
     const relations: DrizzleRelation[] = [];
-    const processedRelations = new Set<string>(); // For deduplication
 
+    // Process each model independently - only generate relations for fields that belong to that model
     for (const model of models) {
       for (const field of model.fields) {
         if (!field.relationName) continue;
@@ -273,84 +273,65 @@ export class SchemaParser {
         const isListField = field.isList;
         const isSelfRelation = model.name === relatedModel.name;
 
-        // Create unique key for deduplication
-        const relationKey = `${field.relationName}_${model.name}_${field.name}`;
-        if (processedRelations.has(relationKey)) continue;
-        processedRelations.add(relationKey);
-
+        // Generate relation for this specific field in this specific model
         if (isForeignKeyOwner) {
-          // This field owns the foreign key - always generate 'one' relation
-          const relation: DrizzleRelation = {
+          // This field owns the foreign key - generate 'one' relation
+          relations.push({
             type: "one",
             foreignKeyTable: model.name,
             foreignKeyField: field.relationFromFields![0]!,
             referencedTable: relatedModel.name,
             referencedField: field.relationToFields![0]!,
-            relationName: this.getRelationFieldName(field, model, relatedModel, 'one'),
+            relationName: field.name,
             onDelete: this.mapOnDeleteAction(field.relationOnDelete),
             onUpdate: this.mapOnUpdateAction(field.relationOnUpdate),
-          };
-          relations.push(relation);
+          });
 
           // For self-relations, also generate the reverse 'many' relation  
           if (isSelfRelation) {
-            const reverseRelationKey = `${field.relationName}_${model.name}_reverse`;
-            if (!processedRelations.has(reverseRelationKey)) {
-              processedRelations.add(reverseRelationKey);
-              
-              const reverseRelation: DrizzleRelation = {
-                type: "many",
-                foreignKeyTable: model.name,
-                foreignKeyField: field.relationFromFields![0]!,
-                referencedTable: relatedModel.name,
-                referencedField: field.relationToFields![0]!,
-                relationName: this.getReverseSelfRelationName(field, model),
-                onDelete: this.mapOnDeleteAction(field.relationOnDelete),
-                onUpdate: this.mapOnUpdateAction(field.relationOnUpdate),
-              };
-              relations.push(reverseRelation);
-            }
+            relations.push({
+              type: "many",
+              foreignKeyTable: model.name,
+              foreignKeyField: field.relationFromFields![0]!,
+              referencedTable: relatedModel.name,
+              referencedField: field.relationToFields![0]!,
+              relationName: this.getReverseSelfRelationName(field, model),
+              onDelete: this.mapOnDeleteAction(field.relationOnDelete),
+              onUpdate: this.mapOnUpdateAction(field.relationOnUpdate),
+            });
           }
-        }
-
-        if (!isForeignKeyOwner && isListField) {
-          // This is a 'many' side relation - find corresponding FK field or handle implicit M:N
+        } else if (isListField) {
+          // This field is a list (many) relation
           const correspondingField = relatedModel.fields.find(
             f => f.relationName === field.relationName && !f.isList && 
                  f.relationFromFields && f.relationFromFields.length > 0
           );
 
-          if (correspondingField) {
-            // Regular 1:M relation - only if not self-relation (already handled above)
-            if (!isSelfRelation) {
-              const relation: DrizzleRelation = {
-                type: "many",
-                foreignKeyTable: relatedModel.name,
-                foreignKeyField: correspondingField.relationFromFields![0]!,
-                referencedTable: model.name,
-                referencedField: correspondingField.relationToFields![0]!,
-                relationName: this.getRelationFieldName(field, model, relatedModel, 'many'),
-                onDelete: this.mapOnDeleteAction(correspondingField.relationOnDelete),
-                onUpdate: this.mapOnUpdateAction(correspondingField.relationOnUpdate),
-              };
-              relations.push(relation);
-            }
-          } else {
-            // Implicit M:N relation (no FK fields)
-            const relation: DrizzleRelation = {
+          if (correspondingField && !isSelfRelation) {
+            // Regular 1:M relation - this table contains the list field, FK is on the related table
+            relations.push({
+              type: "many",
+              foreignKeyTable: model.name,              // Source table (where the list field is)
+              foreignKeyField: correspondingField.relationFromFields![0]!,
+              referencedTable: relatedModel.name,       // Target table (where the FK points)
+              referencedField: correspondingField.relationToFields![0]!,
+              relationName: field.name,
+              onDelete: this.mapOnDeleteAction(correspondingField.relationOnDelete),
+              onUpdate: this.mapOnUpdateAction(correspondingField.relationOnUpdate),
+            });
+          } else if (!correspondingField) {
+            // Implicit M:N relation
+            relations.push({
               type: "many",
               foreignKeyTable: model.name,
-              foreignKeyField: 'id',  // Use actual id field
+              foreignKeyField: 'id',
               referencedTable: relatedModel.name,
-              referencedField: 'id',  // Use actual id field
-              relationName: this.getRelationFieldName(field, model, relatedModel, 'many'),
+              referencedField: 'id',
+              relationName: field.name,
               isImplicitManyToMany: true,
-            };
-            relations.push(relation);
+            });
           }
-        }
-
-        if (!isForeignKeyOwner && !isListField) {
+        } else {
           // This could be the reverse side of a 1:1 relation
           const correspondingField = relatedModel.fields.find(
             f => f.relationName === field.relationName && !f.isList &&
@@ -358,49 +339,22 @@ export class SchemaParser {
           );
 
           if (correspondingField) {
-            // Only generate reverse 1:1 if not already generated from FK owner side
-            const reverseRelationKey = `${field.relationName}_${relatedModel.name}_${correspondingField.name}`;
-            if (!processedRelations.has(reverseRelationKey)) {
-              const relation: DrizzleRelation = {
-                type: "one",
-                foreignKeyTable: relatedModel.name,
-                foreignKeyField: correspondingField.relationFromFields![0]!,
-                referencedTable: model.name,
-                referencedField: correspondingField.relationToFields![0]!,
-                relationName: this.getRelationFieldName(field, model, relatedModel, 'one'),
-                isReverse: true,
-              };
-              relations.push(relation);
-            }
+            // Generate reverse 1:1 relation
+            relations.push({
+              type: "one",
+              foreignKeyTable: relatedModel.name,
+              foreignKeyField: correspondingField.relationFromFields![0]!,
+              referencedTable: model.name,
+              referencedField: correspondingField.relationToFields![0]!,
+              relationName: field.name,
+              isReverse: true,
+            });
           }
         }
       }
     }
 
     return this.deduplicateRelations(relations);
-  }
-
-  private getRelationFieldName(
-    field: DMMF.Field, 
-    sourceModel: DMMF.Model, 
-    targetModel: DMMF.Model, 
-    relationType: 'one' | 'many'
-  ): string {
-    const isSelfRelation = sourceModel.name === targetModel.name;
-    
-    if (isSelfRelation) {
-      // For self-relations, use the field name directly 
-      return relationType === 'many' ? this.ensurePlural(field.name) : field.name;
-    }
-
-    // For regular relations, use field name if meaningful, otherwise derive from target model
-    if (field.name && !field.name.endsWith('Id') && !field.name.endsWith('s') === (relationType === 'one')) {
-      return relationType === 'many' ? this.ensurePlural(field.name) : field.name;
-    }
-
-    // Fallback to target model name
-    const baseName = this.toCamelCase(targetModel.name);
-    return relationType === 'many' ? this.ensurePlural(baseName) : baseName;
   }
 
   private deduplicateRelations(relations: DrizzleRelation[]): DrizzleRelation[] {

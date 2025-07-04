@@ -44,55 +44,33 @@ export class RelationsGenerator {
     
     // Process each relation where this table is involved
     for (const relation of relations) {
-      if (relation.foreignKeyTable === table.tableName && relation.type === "one") {
-        // This table owns the FK - generate one() relation WITH fields/references
-        relationFields.push({
-          fieldName: relation.relationName,
-          targetTable: relation.referencedTable,
-          relationType: 'one',
-          fields: [relation.foreignKeyField],
-          references: [relation.referencedField],
-        });
-      }
-      
-      if (relation.foreignKeyTable === table.tableName && relation.type === "many") {
-        // Self-relation many side
-        relationFields.push({
-          fieldName: relation.relationName,
-          targetTable: relation.referencedTable,
-          relationType: 'many',
-        });
-      }
-      
-      if (relation.referencedTable === table.tableName && relation.type === "many" && !relation.isImplicitManyToMany) {
-        // This table is referenced - generate many() relation
-        relationFields.push({
-          fieldName: relation.relationName,
-          targetTable: relation.foreignKeyTable,
-          relationType: 'many',
-        });
-      }
-      
-      if (relation.referencedTable === table.tableName && relation.type === "one" && relation.isReverse) {
-        // 1:1 reverse - generate one() relation WITHOUT fields (no FK on this side)
+      // ONLY generate relations where this table is the foreign key owner
+      // OR where this table is the target of a reverse 1:1 relation
+      if (relation.foreignKeyTable === table.tableName) {
+        if (relation.type === "one") {
+          // This table owns FK - generate one() relation WITH fields/references
+          relationFields.push({
+            fieldName: relation.relationName,
+            targetTable: relation.referencedTable,
+            relationType: 'one',
+            fields: [relation.foreignKeyField],
+            references: [relation.referencedField],
+          });
+        } else if (relation.type === "many") {
+          // Self-relation many side or M:N
+          relationFields.push({
+            fieldName: relation.relationName,
+            targetTable: relation.referencedTable,
+            relationType: 'many',
+            isImplicitManyToMany: relation.isImplicitManyToMany,
+          });
+        }
+      } else if (relation.referencedTable === table.tableName && relation.isReverse) {
+        // This is a reverse 1:1 relation - generate one() without FK
         relationFields.push({
           fieldName: relation.relationName,
           targetTable: relation.foreignKeyTable,
           relationType: 'one',
-        });
-      }
-      
-      if (relation.isImplicitManyToMany && 
-          (relation.foreignKeyTable === table.tableName || relation.referencedTable === table.tableName)) {
-        // M:N implicit - generate many() on both sides
-        const targetTable = relation.foreignKeyTable === table.tableName ? 
-          relation.referencedTable : relation.foreignKeyTable;
-          
-        relationFields.push({
-          fieldName: relation.relationName,
-          targetTable: targetTable,
-          relationType: 'many',
-          isImplicitManyToMany: true,
         });
       }
     }
