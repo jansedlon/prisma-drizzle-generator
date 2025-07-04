@@ -4,6 +4,6 @@ import { teamMember } from './team-member-schema.js';
 import { project } from './project-schema.js';
 
 export const teamRelations = relations(team, ({ one, many }) => ({
-  teamToTeamMembers: many(teamMember),
-  projectToTeams: many(project)
+  members: many(teamMember),
+  projects: many(project)
 }));

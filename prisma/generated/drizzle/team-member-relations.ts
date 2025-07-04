@@ -4,13 +4,13 @@ import { user } from './user-schema.js';
 import { team } from './team-schema.js';
 
 export const teamMemberRelations = relations(teamMember, ({ one, many }) => ({
-  teamMemberToUsers: many(teamMember),
-  teamToTeamMembers: many(teamMember),
-  teamToTeamMember: one(team, {
+  memberships: many(user),
+  members: many(team),
+  team: one(team, {
     fields: [teamMember.teamId],
     references: [team.id]
   }),
-  teamMemberToUser: one(user, {
+  user: one(user, {
     fields: [teamMember.userId],
     references: [user.id]
   })

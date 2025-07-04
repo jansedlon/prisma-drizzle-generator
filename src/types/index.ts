@@ -74,6 +74,8 @@ export interface DrizzleRelation {
   relationName: string;
   onDelete?: "cascade" | "restrict" | "setNull" | "setDefault";
   onUpdate?: "cascade" | "restrict" | "setNull" | "setDefault";
+  isImplicitManyToMany?: boolean;
+  isReverse?: boolean;
 }
 
 export interface DrizzleEnum {

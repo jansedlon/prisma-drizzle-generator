@@ -3,13 +3,12 @@ import { friendship } from './friendship-schema.js';
 import { user } from './user-schema.js';
 
 export const friendshipRelations = relations(friendship, ({ one, many }) => ({
-  userFriends: many(friendship),
-  friendOfUsers: many(friendship),
-  userFriends: one(user, {
+  friendships: many(user),
+  user: one(user, {
     fields: [friendship.userId],
     references: [user.id]
   }),
-  friendOfUser: one(user, {
+  friend: one(user, {
     fields: [friendship.friendId],
     references: [user.id]
   })

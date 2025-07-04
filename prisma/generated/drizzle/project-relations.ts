@@ -4,10 +4,10 @@ import { team } from './team-schema.js';
 import { task } from './task-schema.js';
 
 export const projectRelations = relations(project, ({ one, many }) => ({
-  projectToTeams: many(project),
-  projectToTeam: one(team, {
+  projects: many(team),
+  team: one(team, {
     fields: [project.teamId],
     references: [team.id]
   }),
-  projectToTasks: many(task)
+  tasks: many(task)
 }));

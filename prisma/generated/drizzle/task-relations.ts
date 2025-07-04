@@ -4,13 +4,13 @@ import { user } from './user-schema.js';
 import { project } from './project-schema.js';
 
 export const taskRelations = relations(task, ({ one, many }) => ({
-  taskToUsers: many(task),
-  projectToTasks: many(task),
-  projectToTask: one(project, {
+  assignedTasks: many(user),
+  tasks: many(project),
+  project: one(project, {
     fields: [task.projectId],
     references: [project.id]
   }),
-  taskToUser: one(user, {
+  assignee: one(user, {
     fields: [task.assigneeId],
     references: [user.id]
   })

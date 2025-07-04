@@ -25,6 +25,7 @@ export * from './category-relations.js';
 export * from './post-relations.js';
 export * from './comment-relations.js';
 export * from './like-relations.js';
+export * from './tag-relations.js';
 export * from './team-relations.js';
 export * from './team-member-relations.js';
 export * from './project-relations.js';
