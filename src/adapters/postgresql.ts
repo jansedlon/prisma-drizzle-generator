@@ -1,4 +1,4 @@
-import { logger } from "@prisma/sdk";
+import { logger } from "@prisma/internals";
 import type {
   DatabaseAdapter,
   DrizzleColumn,

@@ -5,7 +5,7 @@ import {
   type GeneratorOptions,
   generatorHandler,
 } from "@prisma/generator-helper";
-import { logger } from "@prisma/sdk";
+import { logger } from "@prisma/internals";
 import { createDatabaseAdapter } from "./adapters/index.ts";
 import { CodeGenerator } from "./generators/index.ts";
 import { SchemaParser } from "./parsers/schema-parser.ts";

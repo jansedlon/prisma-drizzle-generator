@@ -35,7 +35,8 @@
     "prepublishOnly": "npm run clean && npm run build && npm run test:ci"
   },
   "dependencies": {
-    "@prisma/generator-helper": "^6.11.1",
+    "@prisma/generator-helper": "6.10.0",
+    "@prisma/internals": "^6.11.1",
     "drizzle-orm": "^0.44.2"
   },
   "devDependencies": {
@@ -55,17 +56,15 @@
     "mysql2": "^3.14.1",
     "better-sqlite3": "^12.2.0",
     "@types/better-sqlite3": "^7.6.13",
-    
     "rimraf": "^6.0.1",
     "@types/rimraf": "^4.0.5",
     "tmp": "^0.2.3",
     "fs-extra": "^11.3.0",
     "@types/fs-extra": "^11.0.4",
-    
     "docker-compose": "^1.2.0"
   },
   "peerDependencies": {
-    "prisma": "^6.11.1",
+    "prisma": "6.10.0",
     "drizzle-orm": "^0.44.2"
   },
   "keywords": [
