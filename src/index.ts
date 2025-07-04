@@ -5,11 +5,15 @@ import {
   type GeneratorOptions,
   generatorHandler,
 } from "@prisma/generator-helper";
-import { logger } from "@prisma/sdk";
 import { createDatabaseAdapter } from "./adapters/index.ts";
 import { CodeGenerator } from "./generators/index.ts";
 import { SchemaParser } from "./parsers/schema-parser.ts";
 import { parseGeneratorConfig } from "./utils/config.ts";
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 
 // const PackageJson = Schema.Struct({
 //   version: Schema.String,

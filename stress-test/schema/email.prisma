@@ -1,0 +1,85 @@
+model Email {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    subject     String
+    from        String
+    to          String
+    bodyPreview String?
+
+    providerId  String?     @unique
+    provider    String
+    status      EmailStatus
+    sentAt      DateTime?
+    deliveredAt DateTime?
+
+    events EmailEvent[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([createdAt(sort: Desc)])
+}
+
+enum EmailStatus {
+    SENT
+    FAILED
+}
+
+model EmailEvent {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    emailId String
+    email   Email  @relation(fields: [emailId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+    eventType EmailEventType
+    detail    Json?
+
+    bounceType        String?
+    bounceSubType     String?
+    bounceMessage     String?
+    complaintFeedback String?
+
+    eventTimestamp DateTime
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([emailId, eventTimestamp])
+}
+
+enum EmailEventType {
+    SENT
+    DELIVERED
+    BOUNCED
+    COMPLAINT
+    OPENED
+    CLICKED
+}
+
+model SuppressionList {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    email String @unique
+
+    type          SuppressionListType
+    reason        String?
+    bounceSubType String?
+
+    softBounceCount Int       @default(0)
+    lastBounceAt    DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+enum SuppressionListType {
+    HARD_BOUNCE
+    SOFT_BOUNCE
+    COMPLAINT
+    MANUAL
+    // Not used
+    SUPPRESSION_LIST
+}

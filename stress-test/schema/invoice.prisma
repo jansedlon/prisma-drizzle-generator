@@ -1,0 +1,423 @@
+enum InvoiceV2Type {
+  FLIXY_PRODUCT_PURCHASE
+  FLIXY_SUBSCRIPTION
+  FLIXY_PLATFORM_FEE
+  STRIPE_TRANSACTION_FEE
+  USER_REFERRAL_PAYOUT
+  STORE_SALE
+  STORE_REFUND
+  MANUAL
+}
+
+enum InvoiceV2DocumentType {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PROFORMA_INVOICE
+  ADVANCE_INVOICE
+  CREDIT_NOTE_FOR_ADVANCE_INVOICE
+  SIMPLIFIED_TAX_DOCUMENT
+}
+
+enum InvoiceV2LifecycleStatus {
+  /// Koncept. Faktura ještě nemá přidělené finální číslo.
+  /// Lze ji volně editovat a mazat.
+  /// Tento stav by se používal pro faktury, které si uživatel "rozpracuje" v UI.
+  DRAFT
+
+  /// Čeká na vystavní. Faktuře již bylo přiděleno finální číslo,
+  /// ale ještě nebyly vygenerovány dokumenty (PDF/ISDOC) nebo nebyla odeslána
+  /// do externího systému. Data faktury jsou již "zamrzlá" a neměla by se měnit.
+  /// Toto je stav, ve kterém se faktura nachází po volání `InvoiceCreateService` nebo `InvoiceManagementService`
+  PENDING_ISSUE
+
+  /// Vystaveno. Faktura je finální a neměnná.
+  /// Tento stav nastáváa po úspěšném vygenerování PDF/ISDOC nebo po úspěšné synchronizaci s externím systémem
+  ISSUED
+
+  /// Faktura byla stornována. Konečný stav
+  VOIDED
+
+  /// K faktuře byl vytvořen opravný doklad. Konečný stav
+  CORRECTED
+}
+
+enum InvoiceV2PaymentStatus {
+  /// Čeká na platbu
+  UNPAID
+
+  /// Plně zaplaceno
+  PAID
+
+  /// Částečně zaplaceno
+  PARTIALLY_PAID
+
+  /// Po splatnosti
+  OVERDUE
+
+  /// Refundování (částečně nebo plně)
+  REFUNDED
+}
+
+enum IssuerType {
+  /// Flixy s.r.o.
+  FLIXY
+  /// Uživtel Flixy
+  USER
+  /// Externí entita (např. Stripe pro jejich poplatky)
+  EXTERNAL
+  /// Manuální vystavení ve Flixy
+  MANUAL
+}
+
+enum TaxScheme {
+  /// Tuzemské plnění
+  DOMESTIC
+  /// One Stop Shop (prodej digitálních služeb B2C v rámci EU)
+  OSS_EU
+  /// Přenesená daňová povinnost (typicky B2B v EU)
+  REVERSE_CHARGE_EU
+  /// Vývoz mimo EU
+  EXPORT_OUTSIDE_EU
+  /// Osvobozeno od DPH (jiný důvod než export/OSS)
+  EXEMPT
+  /// Mimo předmět daně
+  OUT_OF_SCOPE
+}
+
+enum TaxClassification {
+  /// Standardní sazba
+  STANDARD
+  /// První snížená sazba
+  REDUCED_LOWER
+  /// Druhá snížená sazba (pokud existuje v dané zemi)
+  REDUCED_UPPER
+  /// Nulová sazba (např. knihy v některých zemích)
+  ZERO_RATE
+  /// Osvobozeno od DPH
+  EXEMPT
+  /// Mimo předmět daně
+  OUT_OF_SCOPE
+}
+
+enum SourceEntityType {
+  STRIPE_PLATFORM_INVOICE
+  STORE_ORDER
+  MANUAL_INPUT
+}
+
+model InvoiceV2 {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Unikátní ID faktury, které se používá pro generování ISDOC
+  uuid String @unique
+
+  /// Unikátní v kontextu vystavovatele, typu a roku (např. FLIXY-2024-001, USER123-SALE-2024-001)
+  invoiceNumber String
+
+  type          InvoiceV2Type
+  documentType  InvoiceV2DocumentType
+  status        InvoiceV2LifecycleStatus @default(DRAFT)
+  paymentStatus InvoiceV2PaymentStatus   @default(UNPAID)
+  languageCode  String
+  language      Language                 @relation(fields: [languageCode], references: [ISOTwoLetterCode])
+
+  /// Datum vystavení
+  issueDate    DateTime
+  /// Datum splatnosti
+  dueDate      DateTime?
+  /// Datum úhrady
+  paymentDate  DateTime?
+  /// Datum zdaňovacího období (DUZP)
+  taxPointDate DateTime?
+
+  // --- Vystavoval (Issuer) ---
+  issuerType         IssuerType
+  /// Pokud issuerType = USER, ID uživatele
+  issuerUserId       String?
+  issuerUser         User?      @relation("IssuedInvoices", fields: [issuerUserId], references: [id])
+  /// Pokud issuerType = EXTERNAL (např. "Stripe Payments Europe, Ltd.")
+  issuerExternalName String?
+
+  issuerName                      String
+  issuerEmail                     String
+  issuerAddressLine1              String?
+  issuerAddressLine2              String?
+  issuerCity                      String?
+  issuerPostalCode                String?
+  issuerCountryCode               String?
+  issuerCountry                   Country? @relation("IssuerInvoices", fields: [issuerCountryCode], references: [code])
+  issuerVatId                     String?
+  issuerRegistrationNumber        String?
+  issuerPhoneNumber               String?
+  issuerBankName                  String?
+  issuerBankAccountNumber         String?
+  issuerBankIban                  String?
+  issuerBankSwift                 String?
+  issuerIsVatPayerAtIssueTime     Boolean
+  issuerVatExemptionReasonAtIssue String?
+
+  // --- Odběratel (Customer) ---
+  // Může být User (pokud Flixy fakturuje uživateli, nebo User fakturuje Flixy)
+  // nebo jen sada údajů pro ad-hoc faktury / koncové zákazníky Store
+
+  /// Pokud je odběratel registrovaný User ve flixy
+  customerUserId  String?
+  customerUser    User?          @relation("ReceivedInvoices", fields: [customerUserId], references: [id])
+  storeCustomerId String?
+  storeCustomer   StoreCustomer? @relation(fields: [storeCustomerId], references: [id])
+
+  customerName                  String
+  customerEmail                 String
+  customerAddressLine1          String?
+  customerAddressLine2          String?
+  customerCity                  String?
+  customerPostalCode            String?
+  customerCountryCode           String?
+  customerCountry               Country? @relation("CustomerInvoices", fields: [customerCountryCode], references: [code])
+  customerVatId                 String?
+  customerRegistrationNumber    String?
+  customerIsBusinessAtIssueTime Boolean
+
+  // --- Finanční údaje ---
+  currencyCode   String
+  currency       Currency @relation(fields: [currencyCode], references: [code])
+  /// Celková částka bez DPH
+  totalNetAmount Int
+  /// Celková DPH
+  totalTaxAmount Int
+  /// Celková částka s DPH (net + tax)
+  totalAmount    Int
+
+  /// Pokud je faktura v cizí měně vůči měně vystavovatele
+  exchangeRateToBaseCurrency Float?
+  /// Měna vystavovatele
+  baseCurrencyCode           String?
+
+  // --- DPH a Daňový režim ---
+  // [{ rate: 21.00, netAmount: 1000.00, taxAmount: 210.00, classification: STANDARD }]
+  /// [InvoiceV2TaxSummary_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2TaxSummary
+  taxSummary Json[]
+
+  taxScheme                 TaxScheme  @default(DOMESTIC)
+  ossDestinationCountryCode String?
+  ossDestinationCountry     Country?   @relation("OSSDestinationInvoices", fields: [ossDestinationCountryCode], references: [code])
+  viesCheckId               String?
+  viesCheck                 ViesCheck? @relation(fields: [viesCheckId], references: [id])
+
+  // --- Odkazy a Metadata ---
+  sourceEntityType SourceEntityType?
+  /// ID původní entity (např. Stripe Invoice ID, StoreOrder ID)
+  sourceEntityId   String?
+
+  correctsInvoiceId  String?    @unique
+  correctionReason   String?
+  correctedByInvoice InvoiceV2? @relation("CorrectingInvoiceRelationship")
+  correctingInvoice  InvoiceV2? @relation("CorrectingInvoiceRelationship", fields: [correctsInvoiceId], references: [id], onDelete: Cascade)
+
+  pdfGeneratedUrl   String?
+  isdocGeneratedUrl String?
+
+  /// Např. "FAKTUROID"
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2ExternalInvoiceProvider
+  externalInvoiceProvider     String?
+  /// ID faktury v externím systému
+  externalInvoiceId           String?
+  /// Další data z externího systému
+  /// [InvoiceV2ExternalInvoiceData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2ExternalInvoiceData
+  externalInvoiceData         Json?
+  paymentGatewayTransactionId String? @unique
+
+  internalNotes    String?
+  /// Kdo/co vytvořilo fakturu (např. system_webhook_stripe, user_action_refund, , worker_adhoc_generation)
+  createdBySource  String?
+  /// Uživatel, který inicioval akci (pokud relevantní)
+  initatedByUserId String?
+
+  // --- Šablony a specifická data ---
+  // Může obsahovat např. specifické texty pro patičku, hlavičku daného typu faktury,
+  // nebo ID šablony PDF/ISDOC, pokud jich bude více
+  /// [InvoiceV2TemplateOverrideData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2TemplateOverrideData
+  templateOverrideData Json?
+  footerNote           String?
+  taxNotes             String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems InvoiceV2LineItem[]
+
+  @@unique([invoiceNumber, issuerType, issuerUserId, issuerExternalName])
+  @@index([issuerType, issuerUserId, issueDate])
+  @@index([customerUserId, issueDate])
+  @@index([status, type])
+  @@index([sourceEntityType, sourceEntityId])
+  // Zajištění unikátnosti čísla faktury v kontextu vystavovatele
+  @@index([correctsInvoiceId])
+}
+
+model InvoiceV2LineItem {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  invoiceId String
+  invoice   InvoiceV2 @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description    String
+  storeProductId String?
+  storeProduct   StoreProduct? @relation(fields: [storeProductId], references: [id])
+  productSku     String?
+
+  quantity Int
+  unit     String?
+
+  /// Jednotková cena bez DPH
+  unitPriceNetAmount Int
+
+  /// Jednotková cena s DPH
+  unitPriceGrossAmount Int
+
+  /// DPH z jednotkové ceny
+  unitPriceTaxAmount Int
+
+  /// Celková cena řádku bez DPH (quantity * unitPriceNetAmount)
+  totalNetAmount   Int
+  /// Celková DPH řádku
+  totalTaxAmount   Int
+  /// Celková cena řádku s DPH (quantity * unitPriceGrossAmount)
+  totalGrossAmount Int
+
+  //{} Sazba DPH v % (např. 21)
+  taxRatePercentage Int
+  taxClassification TaxClassification @default(STANDARD)
+  // Pokud je pro tuto položku specifický daňový režim
+  lineItemTaxScheme TaxScheme?
+
+  sortOrder Int @default(0)
+
+  /// Specifická data pro položku, která se nevejdou jinam
+  /// (např. reference na původní objednávkovou položku, speciální poznámky k položce)
+  /// [InvoiceV2LineItemMetadata_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2LineItemMetadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+}
+
+// Tabulka pro DEFINICE číselných řad. Každý záznam je unikátní formát.
+// Uživatel si může vytvořit kolik chce definic.
+model InvoiceNumberSeriesDefinition {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Kdo vlastní tuto definici (pro uživatelské řady)
+  /// Pro systémové řady (Flixy) může být null
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+  /// Formát čísla faktury, např.: "F{YYYY}-{NNNNN}"
+  formatString String
+
+  /// Popis řady, např. "Faktury za prodejní objednávky"
+  description String?
+
+  /// Relace na periodické sekvence
+  sequences InvoiceNumberSeriesSequence[]
+
+  /// Relace na přiřazení
+  assignments InvoiceNumberSeriesAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Unikátnost je dána kombinaci vlastníka  a formátu, aby neměl stejný formát 2x
+  @@unique([ownerUserId, formatString])
+}
+
+// Tabulka pro PŘIŘAZENÍ definice k určitému účelu (kontextu).
+// Toto je "aktivní" nastavení uživatele.
+model InvoiceNumberSeriesAssignment {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Účel, například "STORE_SALE", "REFERRAL_PAYOUT"
+  baseContextKey String
+
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+  /// Která definice je pro tento účel a vlastníka aktivní
+  seriesDefinitionId String
+  seriesDefinition   InvoiceNumberSeriesDefinition @relation(fields: [seriesDefinitionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Každý vlastník může mít jen jedno přiřazení pro daný kontext.
+  // Toto je náš "master" záznam.
+  @@unique([baseContextKey, ownerUserId])
+}
+
+/// Tabulka pro PERIODICKÉ SEKVENČNÍ ČÍSLA (např. roční)
+model InvoiceNumberSeriesSequence {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  seriesDefinitionId String
+  seriesDefinition   InvoiceNumberSeriesDefinition @relation(fields: [seriesDefinitionId], references: [id], onDelete: Cascade)
+
+  /// Identifikátor periody, pro kterou platí tato sekvence.
+  /// Pro roční reset to bude rok (např. 2024)
+  /// Pro kontinuální řady to může být speciální hodnota (např. 0 nebo "CONTINUOUS")
+  periodIdentifier String
+
+  /// Poslední použité sekvenční číslo pro tuto definici a periodu
+  lastSequenceNumber Int
+
+  updatedAt DateTime @default(now())
+
+  /// Pro každou definici a periodu existuje jen jedna sekvence
+  @@unique([seriesDefinitionId, periodIdentifier])
+}
+
+// model InvoiceCounterV2 {
+//     // Kontext pro číselnou řadu, např.:
+//     // "FLIXY_ISSUER_FLIXY_SUBSCRIPTION"
+//     // "USER_ISSUER_usr_xxxx_STORE_SALE"
+//     // "USER_ISSUER_usr_xxxx_REFERRAL_PAYOUT"
+//     // Rok bude součástí tohoto klíče pro roční reset, např. "FLIXY_ISSUER_FLIXY_SUBSCRIPTION_2024"
+//     contextKey String @id
+
+//     /// Formát čísla faktury, např.:
+//     /// "F{YYYY}-{NNNNN}" -> F2024-00001
+//     /// "{YYYY}{MM}{DD}-{NNN}" -> 20240522-001
+//     /// "INV-{YYYY}/{NN}" -> INV-2024/01
+//     /// Proměnné:
+//     /// {YYYY} - Rok 4 čísla
+//     /// {YY} - Rok 2 čísla
+//     /// {MM} - měsíc
+//     /// {DD} - Den
+//     /// {N...N} - Sekvence, počet N = padding
+//     formatString String
+
+//     /// Poslední použité sekvenční číslo pro daný contextKey (a tedy i rok)
+//     lastSequenceNumber Int
+
+//     // Doplňující informace o číselné řadě
+//     // Např. "Faktury za předplatné flixy", "Prodejní faktury obchodu MůjSuperObchod"
+//     description String?
+//     // Pokud číselnou řadu definuje uživatel
+//     ownerUserId String?
+//     ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+//     updatedAt DateTime @default(now())
+
+//     @@index([ownerUserId])
+// }

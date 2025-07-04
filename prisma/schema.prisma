@@ -1,3 +1,4 @@
+// Comprehensive test schema covering all Prisma features
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,220 +12,501 @@ datasource db {
   url      = env("VITE_PG_DATABASE_URL")
 }
 
-model SelfReference {
-  id String @id
-
-  referringManyId String?
-  referringMany   SelfReference?  @relation("SelfReference_referringMany", fields: [referringManyId], references: [id])
-  referredMany    SelfReference[] @relation("SelfReference_referringMany")
-
-  referringUniqueId String?        @unique
-  referringUnique   SelfReference? @relation("SelfReference_referringUnique", fields: [referringUniqueId], references: [id])
-  referredUnique    SelfReference? @relation("SelfReference_referringUnique")
+// === ENUMS ===
+enum Status {
+  ACTIVE
+  INACTIVE
+  PENDING
+  SUSPENDED
 }
 
-// #region Implicit relationship purposes
-
-model TransactionHeader {
-  id       String          @id
-  products ProductDetail[]
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
-model ProductDetail {
-  id           String              @id
-  transactions TransactionHeader[]
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  USER
+  GUEST
 }
 
-// With custom table name
-model Post {
-  id         String     @id
-  categories Category[] @relation("CustomCategoryToPost")
+// === BASIC TYPES TESTING ===
+model BasicTypes {
+  id            String   @id @default(uuid())
+  
+  // String variations
+  text          String
+  optionalText  String?
+  uniqueText    String   @unique
+  defaultText   String   @default("default value")
+  
+  // Native types testing
+  /// @db.VarChar(255)
+  varcharField  String   @db.VarChar(255)
+  /// @db.Text
+  textField     String   @db.Text
+  /// @db.Char(10)
+  charField     String   @db.Char(10)
+  
+  // Numeric types
+  intField      Int
+  optionalInt   Int?
+  defaultInt    Int      @default(42)
+  bigIntField   BigInt
+  floatField    Float
+  decimalField  Decimal
+  
+  // Native numeric types
+  /// @db.SmallInt
+  smallIntField Int      @db.SmallInt
+  /// @db.Integer
+  integerField  Int      @db.Integer
+  /// @db.BigInt
+  bigintField   BigInt   @db.BigInt
+  /// @db.Real
+  realField     Float    @db.Real
+  /// @db.DoublePrecision
+  doubleField   Float    @db.DoublePrecision
+  /// @db.Decimal(10, 2)
+  preciseDecimal Decimal @db.Decimal(10, 2)
+  /// @db.Money
+  moneyField    Decimal  @db.Money
+  
+  // Boolean
+  boolField     Boolean
+  defaultBool   Boolean  @default(true)
+  
+  // DateTime variations
+  dateTime      DateTime
+  optionalDate  DateTime?
+  defaultNow    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Native datetime types
+  /// @db.Date
+  dateField     DateTime @db.Date
+  /// @db.Time
+  timeField     DateTime @db.Time
+  /// @db.Timestamp
+  timestampField DateTime @db.Timestamp
+  /// @db.Timestamptz
+  timestamptzField DateTime @db.Timestamptz
+  
+  // JSON types
+  jsonField     Json
+  optionalJson  Json?
+  /// @db.JsonB
+  jsonbField    Json     @db.JsonB
+  
+  // Bytes
+  bytesField    Bytes
+  optionalBytes Bytes?
+  
+  // Enum fields
+  status        Status   @default(PENDING)
+  priority      Priority
+  
+  // Custom directives testing
+  /// @drizzle.type(type: "varchar", length: 100)
+  customVarchar String
+  
+  /// @drizzle.default(value: "custom_default")
+  customDefault String   @default("original")
+  
+  /// @drizzle.type(type: "uuid")
+  uuidField     String   @default(uuid())
+  
+  createdAt     DateTime @default(now())
+
+  @@map("basic_types")
+  @@index([status, priority])
+  @@unique([text, intField], name: "text_int_unique")
 }
 
+// === USER SYSTEM (Self-relations, complex relationships) ===
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  username      String     @unique
+  firstName     String?
+  lastName      String?
+  fullName      String?    @default("")
+  role          UserRole   @default(USER)
+  isActive      Boolean    @default(true)
+  lastLoginAt   DateTime?
+  emailVerified Boolean    @default(false)
+  
+  // Self-relation (referral system)
+  referredById  String?
+  referredBy    User?      @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals     User[]     @relation("UserReferrals")
+  
+  // One-to-one relations
+  profile       UserProfile?
+  settings      UserSettings?
+  
+  // One-to-many relations
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
+  assignedTasks Task[]
+  
+  // Many-to-many relations (explicit junction)
+  memberships   TeamMember[]
+  friendships   Friendship[] @relation("UserFriends")
+  friendOf      Friendship[] @relation("FriendOfUser")
+  
+  // Many-to-many implicit
+  followedTags  Tag[]        @relation("UserFollowedTags")
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("users")
+  @@index([email])
+  @@index([username])
+  @@index([role, isActive])
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  bio       String?
+  avatar    String?
+  website   String?
+  location  String?
+  birthDate DateTime?
+  
+  // Native types for testing
+  /// @db.Text
+  longBio   String?  @db.Text
+  /// @db.VarChar(500)
+  shortBio  String?  @db.VarChar(500)
+  
+  // JSON field for metadata
+  metadata  Json?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model UserSettings {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  theme            String  @default("light")
+  language         String  @default("en")
+  timezone         String  @default("UTC")
+  
+  // JSON settings for flexibility
+  preferences      Json?
+  
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+// === CONTENT SYSTEM ===
 model Category {
-  id    String @id
-  posts Post[] @relation("CustomCategoryToPost")
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+  parentId    String?
+  
+  // Self-relation for subcategories
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  
+  posts       Post[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("categories")
+  @@index([slug])
+  @@index([parentId])
 }
 
-// #endregion
+model Post {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  content     String?
+  excerpt     String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  authorId    String
+  categoryId  String?
+  
+  // Native types
+  /// @db.Text
+  longContent String?  @db.Text
+  /// @db.VarChar(160)
+  metaDescription String? @db.VarChar(160)
+  
+  // JSON metadata
+  metadata    Json?
+  
+  // Relations
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments    Comment[]
+  likes       Like[]
+  
+  // Many-to-many with tags
+  tags        Tag[]     @relation("PostTags")
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-// #region Ignore
-
-model IgnoredModel {
-  id String @id @default(uuid())
-
-  @@ignore
+  @@map("posts")
+  @@index([slug])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([published, publishedAt])
 }
 
-model ModelWithIgnoredField {
-  id              String @id @default(uuid())
-  shouldBeIgnored String @ignore
+model Comment {
+  id        String    @id @default(uuid())
+  content   String
+  postId    String
+  authorId  String
+  parentId  String?
+  isDeleted Boolean   @default(false)
+  
+  // Self-relation for replies
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  
+  // Relations
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     Like[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("comments")
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
 }
 
-// #endregion
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String?
+  commentId String?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
 
-// #region Default
-// start -sqlite
-enum EnumForDefault {
-  TypeOne
-  TypeTwo
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@map("likes")
+  @@index([userId])
+  @@index([postId])
+  @@index([commentId])
 }
 
-// end -sqlite
+model Tag {
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  color       String?
+  description String?
+  
+  // Many-to-many relations
+  posts       Post[] @relation("PostTags")
+  followers   User[] @relation("UserFollowedTags")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-model Default {
-  id        String    @id
-  /// drizzle.default @paralleldrive/cuid2::createId
-  alsoId    String?
-  /// drizzle.default crypto::randomBytes `() => randomBytes(16).toString('hex')`
-  salt      String?
-  pgUuid    String?   @default(dbgenerated("gen_random_uuid()")) // -sqlite -mysql
-  date      DateTime? @default("2024-01-23T00:00:00Z")
-  int       Int?      @default(1)
-  boolean   Boolean?  @default(true)
-  createdAt DateTime? @default(now())
-  string    String?   @default("John")
-  bigint    BigInt?   @default(1)
-  decimal   Decimal?  @default(1.123)
-  float     Float?    @default(1.123)
-  bytes     Bytes?    @default("aGVsbG8gd29ybGQ=")
-
-  enum EnumForDefault @default(TypeTwo) // -sqlite
-  json Json?          @default("{\"foo\": \"bar\"}") // -sqlite
-
-  stringList String[] @default(["John", "Doe"]) // -sqlite -mysql
+  @@map("tags")
+  @@index([slug])
 }
 
-model AutoIncrement {
-  id  Int    @id @default(autoincrement())
-  ref String @unique
+// === TEAM SYSTEM (Explicit many-to-many) ===
+model Team {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  slug        String       @unique
+  description String?
+  isActive    Boolean      @default(true)
+  
+  members     TeamMember[]
+  projects    Project[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("teams")
+  @@index([slug])
 }
 
-model AutoIncrementBigInt {
-  id  BigInt @id @default(autoincrement())
-  ref String @unique
+model TeamMember {
+  id       String   @id @default(uuid())
+  teamId   String
+  userId   String
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+  
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([teamId, userId])
+  @@map("team_members")
+  @@index([teamId])
+  @@index([userId])
 }
 
-// #endregion
+// === PROJECT SYSTEM ===
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      Status   @default(PENDING)
+  priority    Priority @default(MEDIUM)
+  teamId      String?
+  
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  tasks       Task[]
+  
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-// #region Field
-
-// start -sqlite
-enum Enum {
-  A
-  B
+  @@map("projects")
+  @@index([teamId])
+  @@index([status, priority])
 }
 
-// end -sqlite
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  status      Status    @default(PENDING)
+  priority    Priority  @default(MEDIUM)
+  projectId   String
+  assigneeId  String?
+  
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-model Field {
-  id         String    @id
-  string     String?
-  boolean    Boolean?
-  int        Int?
-  bigint     BigInt?
-  float      Float?
-  decimal    Decimal?
-  datetime   DateTime?
-  stringList String[] // -mysql -sqlite
-  bytes      Bytes?
-  json       Json? // -sqlite
-  enum       Enum? // -sqlite
+  @@map("tasks")
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status, priority])
 }
 
-// #endregion
+// === SOCIAL FEATURES ===
+model Friendship {
+  id         String   @id @default(uuid())
+  userId     String
+  friendId   String
+  status     String   @default("pending") // pending, accepted, rejected, blocked
+  
+  user       User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend     User     @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-// #region one to many
-model OneToMany_One {
-  id     String         @id
-  manyId String
-  many   OneToMany_Many @relation(fields: [manyId], references: [id])
+  @@unique([userId, friendId])
+  @@map("friendships")
+  @@index([userId])
+  @@index([friendId])
+  @@index([status])
 }
 
-model OneToMany_Many {
-  id   String          @id
-  ones OneToMany_One[]
+// === NOTIFICATION SYSTEM ===
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String?
+  isRead    Boolean  @default(false)
+  data      Json?    // Additional notification data
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
 }
 
-// #endregion
-
-// #region one to one
-model OneToOne_A {
-  id  String      @id
-  b   OneToOne_B? @relation(fields: [bId], references: [id])
-  bId String?     @unique
+// === EDGE CASES ===
+// Model with only relations (junction table alternative)
+model EventAttendee {
+  eventId String
+  userId  String
+  status  String @default("going")
+  
+  // These would be relations if Event model existed
+  // event   Event @relation(fields: [eventId], references: [id])
+  // user    User  @relation(fields: [userId], references: [id])
+  
+  @@id([eventId, userId])
+  @@map("event_attendees")
 }
 
-model OneToOne_B {
-  id String      @id
-  a  OneToOne_A?
-  c  OneToOne_C?
+// Model with very long names and special characters
+model VeryLongModelNameThatTestsNamingConventionsAndEdgeCases {
+  id                                    String @id @default(uuid())
+  aVeryLongFieldNameThatMightCauseIssues String
+  field_with_underscores                String
+  fieldWithNumbers123                   String
+  
+  @@map("very_long_table_name_for_testing")
 }
 
-model OneToOne_C {
-  id  String     @id
-  b   OneToOne_B @relation(fields: [bId], references: [id])
-  bId String     @unique
+// Model with reserved keywords
+model Order {
+  id       String @id @default(uuid())
+  select   String // 'select' is SQL reserved keyword
+  from     String // 'from' is SQL reserved keyword
+  where    String // 'where' is SQL reserved keyword
+  order    Int    // 'order' is SQL reserved keyword
+  group    String // 'group' is SQL reserved keyword
+  
+  @@map("orders")
 }
 
-// #endregion
-
-// #region Disambiguating
-model Disambiguating_Transfer {
-  id          String               @id
-  from        Disambiguating_User  @relation("Disambiguating_Transfer_from", fields: [fromId], references: [id])
-  fromId      String
-  to          Disambiguating_User  @relation("Disambiguating_Transfer_to", fields: [toId], references: [id])
-  toId        String
-  salePayment Disambiguating_Sale? @relation("Disambiguating_Sale_payment")
-  saleTax     Disambiguating_Sale? @relation("Disambiguating_Sale_tax")
-  createdAt   DateTime             @default(now())
-}
-
-model Disambiguating_User {
-  id String @id
-
-  receivedTransfers Disambiguating_Transfer[] @relation("Disambiguating_Transfer_to")
-  sentTransfers     Disambiguating_Transfer[] @relation("Disambiguating_Transfer_from")
-}
-
-model Disambiguating_Sale {
-  id        String                  @id
-  payment   Disambiguating_Transfer @relation("Disambiguating_Sale_payment", fields: [paymentId], references: [id])
-  paymentId String                  @unique
-  tax       Disambiguating_Transfer @relation("Disambiguating_Sale_tax", fields: [taxId], references: [id])
-  taxId     String                  @unique
-}
-
-// #endregion
-
-// #region https://github.com/farreldarian/prisma-generator-drizzle/issues/55
-
-model Disambiguating_Country {
-  id         String                    @id @default(cuid())
-  currencies Disambiguating_Currency[]
-}
-
-model Disambiguating_Currency {
-  code      String                   @id @unique
-  countries Disambiguating_Country[]
-}
-
-// #endregion
-
-model FieldCustomization {
-  id        Int    @id @default(autoincrement())
-  /// drizzle.custom {
-  ///   "imports": [{ "name": ["SomeBigInt"], "module": "~/tests/shared/testFieldCustomization", "type": true }],
-  ///   "$type": "SomeBigInt",
-  ///   "default": "() => 1n",
-  ///   "field": { "mode": "number" }
-  /// }
-  allFields BigInt
-}
-
-model MappingField {
-  id String @id
-
-  code String @map("alpha2")
+// Composite primary key testing
+model UserTask {
+  userId String
+  taskId String
+  role   String @default("viewer")
+  
+  @@id([userId, taskId])
+  @@map("user_tasks")
 }

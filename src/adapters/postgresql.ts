@@ -1,10 +1,18 @@
-import { logger } from "@prisma/sdk";
 import type {
   DatabaseAdapter,
   DrizzleColumn,
   DrizzleColumnType,
   DrizzleRelation,
+  DrizzleUniqueConstraint,
+  DrizzleIndex,
+  DrizzleCompoundPrimaryKey,
 } from "../types/index.js";
+
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 
 export class PostgreSQLAdapter implements DatabaseAdapter {
   name = "postgresql";
@@ -52,6 +60,70 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     },
   };
 
+  // New method: Add native PostgreSQL type mappings
+  private nativeTypeMap: Record<string, { 
+    drizzleType: string; 
+    typeArgsGenerator?: (args?: string[]) => string[] | undefined;
+  }> = {
+    'VarChar': {
+      drizzleType: "varchar",
+      typeArgsGenerator: (args?: string[]) => args?.[0] ? [`{ length: ${args[0]} }`] : undefined,
+    },
+    'Text': {
+      drizzleType: "text",
+    },
+    'Char': {
+      drizzleType: "char",
+      typeArgsGenerator: (args?: string[]) => args?.[0] ? [`{ length: ${args[0]} }`] : undefined,
+    },
+    'SmallInt': {
+      drizzleType: "smallint",
+    },
+    'Integer': {
+      drizzleType: "integer",
+    },
+    'BigInt': {
+      drizzleType: "bigint",
+      typeArgsGenerator: () => ["{ mode: 'number' }"],
+    },
+    'Real': {
+      drizzleType: "real",
+    },
+    'DoublePrecision': {
+      drizzleType: "doublePrecision",
+    },
+    'Decimal': {
+      drizzleType: "decimal",
+      typeArgsGenerator: (args?: string[]) => {
+        if (args?.[0] && args?.[1]) return [`{ precision: ${args[0]}, scale: ${args[1]} }`];
+        if (args?.[0]) return [`{ precision: ${args[0]} }`];
+        return undefined;
+      },
+    },
+    'Money': {
+      drizzleType: "decimal", // Money maps to decimal in Drizzle
+    },
+    'Date': {
+      drizzleType: "date",
+      typeArgsGenerator: () => ['{ mode: "date" }'],
+    },
+    'Time': {
+      drizzleType: "time",
+      typeArgsGenerator: () => ['{ withTimezone: true }'],
+    },
+    'Timestamp': {
+      drizzleType: "timestamp",
+      typeArgsGenerator: () => ['{ mode: "date" }'],
+    },
+    'Timestamptz': {
+      drizzleType: "timestamp",
+      typeArgsGenerator: () => ['{ withTimezone: true, mode: "date" }'],
+    },
+    'JsonB': {
+      drizzleType: "jsonb",
+    },
+  };
+
   mapPrismaType(prismaType: string, _isOptional: boolean): DrizzleColumnType {
     const baseType = this.typeMap[prismaType];
     if (!baseType) {
@@ -60,21 +132,51 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     return baseType;
   }
 
+  // New method: Handle native PostgreSQL types
+  mapNativeType(nativeType: string, args?: string[]): Partial<DrizzleColumnType> {
+    const mapping = this.nativeTypeMap[nativeType];
+    if (!mapping) {
+      logger.warn(`Unsupported native PostgreSQL type: ${nativeType}`);
+      return {};
+    }
+
+    const result: Partial<DrizzleColumnType> = {
+      drizzleType: mapping.drizzleType,
+      importPath: "drizzle-orm/pg-core"
+    };
+    
+    // Handle type arguments for native types
+    if (mapping.typeArgsGenerator) {
+      result.typeArguments = mapping.typeArgsGenerator(args);
+    }
+
+    return result;
+  }
+
   getImports(): string[] {
     return [
       "pgTable",
       "text",
+      "varchar", 
+      "char",
       "integer",
+      "smallint",
       "bigint",
       "real",
+      "doublePrecision",
       "decimal",
       "boolean",
       "timestamp",
+      "date",
+      "time",
       "jsonb",
       "serial",
       "uuid",
       "pgEnum",
       "sql",
+      "unique",
+      "index",
+      "primaryKey",
     ];
   }
 
@@ -108,6 +210,11 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
       modifiers.push("notNull()");
     }
 
+    // Handle @updatedAt columns
+    if (column.isUpdatedAt) {
+      modifiers.push("$onUpdate(() => new Date())");
+    }
+
     // Apply custom directives for defaults
     let hasCustomDefault = false;
     if (column.customDirectives) {
@@ -123,7 +230,12 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
     // Only add regular default if no custom default was applied
     if (column.defaultValue && !hasCustomDefault) {
-      modifiers.push(`default(${column.defaultValue})`);
+      // Handle special column builder methods
+      if (column.defaultValue === "defaultNow") {
+        modifiers.push("defaultNow()");
+      } else {
+        modifiers.push(`default(${column.defaultValue})`);
+      }
     }
 
     if (modifiers.length > 0) {
@@ -150,5 +262,36 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
     reference += ")";
     return reference;
+  }
+
+  // New method: Generate unique constraint
+  generateUniqueConstraint(constraint: DrizzleUniqueConstraint): string {
+    const columns = constraint.columns.map(col => `table.${col}`).join(", ");
+    if (constraint.name) {
+      return `unique('${constraint.name}').on(${columns})`;
+    }
+    return `unique().on(${columns})`;
+  }
+
+  // New method: Generate index definition  
+  generateIndexDefinition(index: DrizzleIndex): string {
+    const columns = index.columns.map(col => `table.${col}`).join(", ");
+    if (index.name) {
+      if (index.unique) {
+        return `uniqueIndex('${index.name}').on(${columns})`;
+      }
+      return `index('${index.name}').on(${columns})`;
+    } else {
+      if (index.unique) {
+        return `uniqueIndex().on(${columns})`;
+      }
+      return `index().on(${columns})`;
+    }
+  }
+
+  // New method: Generate compound primary key
+  generateCompoundPrimaryKey(constraint: DrizzleCompoundPrimaryKey): string {
+    const columns = constraint.columns.map(col => `table.${col}`).join(", ");
+    return `primaryKey({ columns: [${columns}] })`;
   }
 }

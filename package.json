@@ -1,53 +1,102 @@
 {
   "name": "prisma-drizzle-generator",
   "version": "1.0.0",
-  "description": "A Prisma generator that creates Drizzle ORM schema from Prisma schema",
+  "description": "A Prisma generator that converts Prisma schemas to Drizzle ORM schemas with comprehensive relation support",
   "main": "dist/index.js",
-  "module": "dist/index.js",
   "type": "module",
   "bin": {
-    "prisma-drizzle-generator": "dist/index.cjs"
+    "prisma-drizzle-generator": "dist/index.js"
   },
   "scripts": {
     "build": "tsdown",
-    "dev": "bun --hot src/index.ts",
-    "test": "bun test",
-    "test:unit": "bun test test/unit",
-    "test:e2e": "bun test/e2e/index.ts",
-    "test:e2e:verbose": "bun test/e2e/index.ts --verbose",
-    "test:e2e:no-docker": "bun --inspect-brk test/e2e/index.ts --skip-docker",
-    "test:all": "bun run test:unit && bun run test:e2e",
-    "format": "biome format --write .",
-    "lint": "biome lint .",
-    "generate": "bun run build && bun run prisma generate",
-    "generate:watch": "bun run ./generate-watch.ts"
+    "dev": "tsdown --watch",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "test:types": "tsd",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:types && npm run test:e2e",
+    "test:ci": "vitest run --coverage --reporter=verbose",
+    "prisma": "prisma",
+    "prisma:generate": "bun run build && prisma generate",
+    "prisma:studio": "prisma studio",
+    "docker:postgres": "docker run --name drizzle-test-postgres -e POSTGRES_PASSWORD=testpass -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:15",
+    "docker:mysql": "docker run --name drizzle-test-mysql -e MYSQL_ROOT_PASSWORD=testpass -e MYSQL_DATABASE=testdb -p 3306:3306 -d mysql:8",
+    "docker:cleanup": "docker stop drizzle-test-postgres drizzle-test-mysql && docker rm drizzle-test-postgres drizzle-test-mysql",
+    "benchmark": "vitest run tests/performance --reporter=verbose",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist coverage",
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run clean && npm run build && npm run test:ci"
   },
   "dependencies": {
-    "@effect/platform": "^0.87.5",
-    "@effect/platform-bun": "^0.72.9",
-    "@prisma/client": "^6.11.1",
-    "@prisma/generator-helper": "^6.11.1",
-    "@prisma/sdk": "^4.0.0",
-    "drizzle-orm": "^0.44.2",
-    "effect": "^3.16.11"
+    "@prisma/generator-helper": "6.10.0",
+    "@prisma/internals": "^6.11.1",
+    "drizzle-orm": "^0.44.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.6",
-    "@types/bun": "latest",
-    "@types/node": "^24.0.10",
-    "tsdown": "^0.12.9"
+    "@types/node": "^22.16.0",
+    "@types/tmp": "^0.2.6",
+    "typescript": "^5.8.3",
+    "tsdown": "^0.12.9",
+    "vitest": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "tsd": "^0.32.0",
+    "@testcontainers/postgresql": "^11.0.3",
+    "@testcontainers/mysql": "^11.0.3",
+    "testcontainers": "^11.0.3",
+    "drizzle-kit": "^0.31.4",
+    "postgres": "^3.4.7",
+    "mysql2": "^3.14.1",
+    "better-sqlite3": "^12.2.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "rimraf": "^6.0.1",
+    "@types/rimraf": "^4.0.5",
+    "tmp": "^0.2.3",
+    "fs-extra": "^11.3.0",
+    "@types/fs-extra": "^11.0.4",
+    "docker-compose": "^1.2.0"
   },
   "peerDependencies": {
-    "prisma": "^6.11.1",
-    "typescript": "^5"
+    "prisma": "6.10.0",
+    "drizzle-orm": "^0.44.2"
   },
   "keywords": [
     "prisma",
     "drizzle",
-    "generator",
     "orm",
-    "typescript"
+    "generator",
+    "database",
+    "typescript",
+    "relations",
+    "schema"
   ],
-  "author": "Jan Sedlon",
-  "license": "MIT"
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/prisma-drizzle-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/prisma-drizzle-generator/issues"
+  },
+  "homepage": "https://github.com/your-org/prisma-drizzle-generator#readme",
+  "license": "MIT",
+  "author": "Your Name <your.email@example.com>",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/your-username"
+  }
 }

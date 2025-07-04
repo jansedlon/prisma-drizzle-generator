@@ -1,9 +1,14 @@
-import { logger } from "@prisma/sdk";
 import type {
   DatabaseAdapter,
   DrizzleEnum,
   GeneratorConfig,
 } from "../types/index.js";
+
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 
 export class EnumsGenerator {
   constructor(
@@ -30,10 +35,15 @@ export class EnumsGenerator {
   }
 
   private generateEnumDefinition(enumItem: DrizzleEnum): string {
-    const enumName = `${this.toSnakeCase(enumItem.name)}Enum`;
+    const enumName = `${this.toCamelCase(enumItem.name)}Enum`;
+    const dbName = this.toSnakeCase(enumItem.name);
     const values = enumItem.values.map((value) => `'${value}'`).join(", ");
 
-    return `export const ${enumName} = pgEnum('${this.toSnakeCase(enumItem.name)}', [${values}]);`;
+    return `export const ${enumName} = pgEnum('${dbName}', [${values}]);`;
+  }
+
+  private toCamelCase(str: string): string {
+    return str.charAt(0).toLowerCase() + str.slice(1);
   }
 
   private toSnakeCase(str: string): string {

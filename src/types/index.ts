@@ -14,6 +14,9 @@ export interface DatabaseAdapter {
   generateTableFunction(tableName: string): string;
   generateColumnDefinition(column: DrizzleColumn): string;
   generateRelationReference(relation: DrizzleRelation): string;
+  generateUniqueConstraint(constraint: DrizzleUniqueConstraint): string;
+  generateIndexDefinition(index: DrizzleIndex): string;
+  generateCompoundPrimaryKey(constraint: DrizzleCompoundPrimaryKey): string;
 }
 
 export interface DrizzleColumn {
@@ -25,20 +28,41 @@ export interface DrizzleColumn {
   primaryKey: boolean;
   unique: boolean;
   customDirectives?: CustomDirective[];
+  isUpdatedAt?: boolean;
 }
 
 export interface DrizzleColumnType {
   drizzleType: string;
   importPath: string;
   typeArguments?: string[];
+  options?: Record<string, unknown>;
+}
+
+export interface DrizzleUniqueConstraint {
+  name?: string;
+  columns: string[];
+}
+
+export interface DrizzleIndex {
+  name?: string;
+  columns: string[];
+  unique?: boolean;
+}
+
+export interface DrizzleCompoundPrimaryKey {
+  columns: string[];
 }
 
 export interface DrizzleTable {
   name: string;
   tableName: string;
+  dbTableName?: string;
   columns: DrizzleColumn[];
   enums: DrizzleEnum[];
   customDirectives?: CustomDirective[];
+  uniqueConstraints?: DrizzleUniqueConstraint[];
+  indexes?: DrizzleIndex[];
+  compoundPrimaryKey?: DrizzleCompoundPrimaryKey;
 }
 
 export interface DrizzleRelation {
@@ -50,6 +74,8 @@ export interface DrizzleRelation {
   relationName: string;
   onDelete?: "cascade" | "restrict" | "setNull" | "setDefault";
   onUpdate?: "cascade" | "restrict" | "setNull" | "setDefault";
+  isImplicitManyToMany?: boolean;
+  isReverse?: boolean;
 }
 
 export interface DrizzleEnum {
