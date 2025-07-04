@@ -100,9 +100,11 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     },
     'Date': {
       drizzleType: "date",
+      typeArgsGenerator: () => ['{ mode: "date" }'],
     },
     'Time': {
       drizzleType: "time",
+      typeArgsGenerator: () => ['{ withTimezone: true }'],
     },
     'Timestamp': {
       drizzleType: "timestamp",
@@ -254,7 +256,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   // New method: Generate unique constraint
   generateUniqueConstraint(constraint: DrizzleUniqueConstraint): string {
-    const columns = constraint.columns.map(col => `'${col}'`).join(", ");
+    const columns = constraint.columns.map(col => `table.${col}`).join(", ");
     if (constraint.name) {
       return `unique('${constraint.name}').on(${columns})`;
     }
@@ -263,25 +265,23 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   // New method: Generate index definition  
   generateIndexDefinition(index: DrizzleIndex): string {
-    const columns = index.columns.map(col => `'${col}'`).join(", ");
-    let indexDef = "index(";
-    
+    const columns = index.columns.map(col => `table.${col}`).join(", ");
     if (index.name) {
-      indexDef += `'${index.name}'`;
+      if (index.unique) {
+        return `uniqueIndex('${index.name}').on(${columns})`;
+      }
+      return `index('${index.name}').on(${columns})`;
+    } else {
+      if (index.unique) {
+        return `uniqueIndex().on(${columns})`;
+      }
+      return `index().on(${columns})`;
     }
-    
-    indexDef += `).on(${columns})`;
-    
-    if (index.unique) {
-      indexDef = `unique${indexDef}`;
-    }
-    
-    return indexDef;
   }
 
   // New method: Generate compound primary key
   generateCompoundPrimaryKey(constraint: DrizzleCompoundPrimaryKey): string {
-    const columns = constraint.columns.map(col => `'${col}'`).join(", ");
+    const columns = constraint.columns.map(col => `table.${col}`).join(", ");
     return `primaryKey({ columns: [${columns}] })`;
   }
 }

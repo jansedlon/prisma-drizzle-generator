@@ -5,7 +5,8 @@ export const like = pgTable('likes', {
   userId: text('userId').notNull(),
   postId: text('postId'),
   commentId: text('commentId'),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
-  unique().on('userId', 'postId'),
-  unique().on('userId', 'commentId')
-});
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow())
+}, (table) => [
+  unique().on(table.userId, table.postId),
+  unique().on(table.userId, table.commentId)
+]);

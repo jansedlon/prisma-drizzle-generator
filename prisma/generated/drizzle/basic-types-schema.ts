@@ -29,8 +29,8 @@ export const basicTypes = pgTable('basic_types', {
   optionalDate: timestamp('optionalDate', { withTimezone: true, mode: "date" }),
   defaultNow: timestamp('defaultNow', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date()),
-  dateField: date('dateField', { withTimezone: true, mode: "date" }).notNull(),
-  timeField: time('timeField', { withTimezone: true, mode: "date" }).notNull(),
+  dateField: date('dateField', { mode: "date" }).notNull(),
+  timeField: time('timeField', { withTimezone: true }).notNull(),
   timestampField: timestamp('timestampField', { mode: "date" }).notNull(),
   timestamptzField: timestamp('timestamptzField', { withTimezone: true, mode: "date" }).notNull(),
   jsonField: jsonb('jsonField').notNull(),
@@ -43,6 +43,7 @@ export const basicTypes = pgTable('basic_types', {
   customVarchar: text('customVarchar').notNull(),
   customDefault: text('customDefault').notNull().default('original'),
   uuidField: text('uuidField').notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
-  unique('text_int_unique').on('text', 'intField')
-});
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow())
+}, (table) => [
+  unique('text_int_unique').on(table.text, table.intField)
+]);

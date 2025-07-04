@@ -5,6 +5,7 @@ export const teamMember = pgTable('team_members', {
   teamId: text('teamId').notNull(),
   userId: text('userId').notNull(),
   role: text('role').notNull().default('member'),
-  joinedAt: timestamp('joinedAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
-  unique().on('teamId', 'userId')
-});
+  joinedAt: timestamp('joinedAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow())
+}, (table) => [
+  unique().on(table.teamId, table.userId)
+]);

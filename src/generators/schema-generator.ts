@@ -53,7 +53,16 @@ export class SchemaGenerator {
     }
 
     if (table.indexes && table.indexes.length > 0) {
-      imports.add('index');
+      // Check if we need regular index or unique index imports
+      const hasRegularIndexes = table.indexes.some(index => !index.unique);
+      const hasUniqueIndexes = table.indexes.some(index => index.unique);
+      
+      if (hasRegularIndexes) {
+        imports.add('index');
+      }
+      if (hasUniqueIndexes) {
+        imports.add('uniqueIndex');
+      }
     }
 
     // Check if we need $onUpdate for @updatedAt fields
@@ -84,7 +93,7 @@ export class SchemaGenerator {
       .map((col) => `  ${this.adapter.generateColumnDefinition(col)}`)
       .join(",\n");
 
-    // Generate compound constraints
+    // Generate constraints and indexes in callback function (correct Drizzle syntax)
     const constraints: string[] = [];
 
     // Add compound primary key if present
@@ -106,10 +115,14 @@ export class SchemaGenerator {
       }
     }
 
-    const constraintsString = constraints.length > 0 ? `,\n${constraints.join(",\n")}` : "";
-    
     const constName = this.getValidConstantName(this.toCamelCase(tableName));
-    return `export const ${constName} = ${tableStart}\n${columns}${constraintsString}\n});`;
+    
+    // Use correct Drizzle syntax with callback function for constraints
+    if (constraints.length > 0) {
+      return `export const ${constName} = ${tableStart}\n${columns}\n}, (table) => [\n${constraints.join(",\n")}\n]);`;
+    } else {
+      return `export const ${constName} = ${tableStart}\n${columns}\n});`;
+    }
   }
 
   private toCamelCase(str: string): string {
