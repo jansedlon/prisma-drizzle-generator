@@ -1,5 +1,7 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
-export const enum_for_defaultEnum = pgEnum('enum_for_default', ['TypeOne', 'TypeTwo']);
+export const statusEnum = pgEnum('status', ['ACTIVE', 'INACTIVE', 'PENDING', 'SUSPENDED']);
 
-export const enumEnum = pgEnum('enum', ['A', 'B']);
+export const priorityEnum = pgEnum('priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
+
+export const user_roleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'USER', 'GUEST']);

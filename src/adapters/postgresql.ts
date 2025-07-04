@@ -254,7 +254,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   // New method: Generate unique constraint
   generateUniqueConstraint(constraint: DrizzleUniqueConstraint): string {
-    const columns = constraint.columns.map(col => `${col}`).join(", ");
+    const columns = constraint.columns.map(col => `'${col}'`).join(", ");
     if (constraint.name) {
       return `unique('${constraint.name}').on(${columns})`;
     }
@@ -263,7 +263,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   // New method: Generate index definition  
   generateIndexDefinition(index: DrizzleIndex): string {
-    const columns = index.columns.map(col => `${col}`).join(", ");
+    const columns = index.columns.map(col => `'${col}'`).join(", ");
     let indexDef = "index(";
     
     if (index.name) {
@@ -281,7 +281,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
   // New method: Generate compound primary key
   generateCompoundPrimaryKey(constraint: DrizzleCompoundPrimaryKey): string {
-    const columns = constraint.columns.map(col => `${col}`).join(", ");
+    const columns = constraint.columns.map(col => `'${col}'`).join(", ");
     return `primaryKey({ columns: [${columns}] })`;
   }
 }

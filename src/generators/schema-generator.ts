@@ -22,9 +22,11 @@ export class SchemaGenerator {
   private generateImports(table: DrizzleTable): string {
     const imports = new Set<string>();
 
-    // Add base imports from adapter
-    for (const imp of table.columns.map((col) => col.type.drizzleType)) {
-      imports.add(imp);
+    // Add base imports from adapter, excluding enum names
+    for (const col of table.columns) {
+      if (!col.type.drizzleType.includes('Enum')) {
+        imports.add(col.type.drizzleType);
+      }
     }
 
     for (const imp of this.adapter.alwaysPresentImports) {
@@ -59,10 +61,8 @@ export class SchemaGenerator {
     
     if (needsOnUpdate) imports.add('$onUpdate');
 
-    // Add relation imports if needed
-    if (table.columns.some((col) => col.type.importPath === "./enums.js")) {
-      imports.add("pgEnum");
-    }
+    // Note: pgEnum will be added if needed when enums are present
+    // No need to explicitly add it here as it may cause duplicates
 
     const importList = Array.from(imports).join(", ");
     let importStatement = `import { ${importList} } from '${this.adapter.name === "postgresql" ? "drizzle-orm/pg-core" : "drizzle-orm"}';`;

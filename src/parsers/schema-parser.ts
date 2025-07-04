@@ -75,11 +75,43 @@ export class SchemaParser {
   private parseUniqueConstraints(model: DMMF.Model): DrizzleUniqueConstraint[] {
     const constraints: DrizzleUniqueConstraint[] = [];
 
-    // Parse @@unique from model attributes
-    // Note: DMMF.Model may not have uniqueFields directly, but compound unique constraints
-    // are typically handled through the @@unique attribute which may be in documentation
-    // For now, we'll extract from model structure if available
-    
+    // Parse uniqueFields (array of arrays of field names)
+    if ('uniqueFields' in model && Array.isArray((model as any).uniqueFields)) {
+      const uniqueFields = (model as any).uniqueFields;
+      for (const fieldArray of uniqueFields) {
+        if (Array.isArray(fieldArray)) {
+          constraints.push({
+            name: undefined, // uniqueFields doesn't provide names
+            columns: [...fieldArray],
+          });
+        }
+      }
+    }
+
+    // Parse uniqueIndexes (array of objects with name and fields)
+    if ('uniqueIndexes' in model && Array.isArray((model as any).uniqueIndexes)) {
+      const uniqueIndexes = (model as any).uniqueIndexes;
+      for (const constraint of uniqueIndexes) {
+        if (constraint && constraint.fields && Array.isArray(constraint.fields)) {
+          // Only add if not already added from uniqueFields (avoid duplicates)
+          const existingConstraint = constraints.find(c => 
+            c.columns.length === constraint.fields.length &&
+            c.columns.every((col, idx) => col === constraint.fields[idx])
+          );
+          
+          if (!existingConstraint) {
+            constraints.push({
+              name: constraint.name || undefined,
+              columns: [...constraint.fields],
+            });
+          } else if (constraint.name && !existingConstraint.name) {
+            // Update existing constraint with name if it has one
+            existingConstraint.name = constraint.name;
+          }
+        }
+      }
+    }
+
     return constraints;
   }
 
@@ -87,9 +119,9 @@ export class SchemaParser {
   private parseIndexes(model: DMMF.Model): DrizzleIndex[] {
     const indexes: DrizzleIndex[] = [];
 
-    // Parse @@index from model attributes  
-    // Note: Indexes need to be extracted from model documentation or other sources
-    // as DMMF.Model structure may not directly expose index information
+    // Note: Prisma DMMF does not expose @@index information 
+    // This is a known limitation - @@index directives are not available in DMMF
+    // Regular indexes would need to be handled through other means (e.g., custom parsing)
     
     return indexes;
   }
@@ -198,7 +230,7 @@ export class SchemaParser {
         case "autoincrement":
           return undefined; // Handle with serial type
         case "now":
-          return "default()";
+          return "defaultNow()";
         case "uuid":
           return undefined; // No direct equivalent in Drizzle
         case "cuid":
