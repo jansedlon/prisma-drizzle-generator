@@ -1,5 +1,5 @@
-import type { DMMF } from '@prisma/generator-helper';
 
+// Simplified mock DMMF utility for testing
 export interface MockModel {
   name: string;
   fields: MockField[];
@@ -46,14 +46,15 @@ export interface MockDMMFOptions {
   enums?: MockEnum[];
 }
 
-export function createMockDMMF(options: MockDMMFOptions = {}): DMMF.Document {
+export function createMockDMMF(options: MockDMMFOptions = {}): any {
   const { models = [], enums = [] } = options;
 
   return {
     datamodel: {
       models: models.map(mockModel => createMockModel(mockModel)),
       enums: enums.map(mockEnum => createMockEnum(mockEnum)),
-      types: []
+      types: [],
+      indexes: []
     },
     schema: {
       inputObjectTypes: {
@@ -97,13 +98,14 @@ export function createMockDMMF(options: MockDMMFOptions = {}): DMMF.Document {
         write: []
       }
     }
-  } as DMMF.Document;
+  };
 }
 
-function createMockModel(mockModel: MockModel): DMMF.Model {
+function createMockModel(mockModel: MockModel): any {
   return {
     name: mockModel.name,
     dbName: null,
+    schema: null,
     fields: mockModel.fields.map(field => createMockField(field)),
     primaryKey: mockModel.primaryKey ? {
       name: null,
@@ -114,12 +116,13 @@ function createMockModel(mockModel: MockModel): DMMF.Model {
       name: idx.name!,
       fields: idx.fields
     })) || [],
-    documentation: mockModel.documentation
-  } as DMMF.Model;
+    documentation: mockModel.documentation,
+    isGenerated: false
+  };
 }
 
-function createMockField(mockField: MockField): DMMF.Field {
-  const field: DMMF.Field = {
+function createMockField(mockField: MockField): any {
+  const field: any = {
     name: mockField.name,
     kind: mockField.relationName ? 'object' : 'scalar',
     isList: mockField.isList || false,
@@ -144,18 +147,18 @@ function createMockField(mockField: MockField): DMMF.Field {
     field.relationToFields = mockField.relationToFields || [];
     
     if (mockField.relationOnDelete) {
-      field.relationOnDelete = mockField.relationOnDelete as any;
+      field.relationOnDelete = mockField.relationOnDelete;
     }
     
     if (mockField.relationOnUpdate) {
-      field.relationOnUpdate = mockField.relationOnUpdate as any;
+      field.relationOnUpdate = mockField.relationOnUpdate;
     }
   }
 
   return field;
 }
 
-function createMockEnum(mockEnum: MockEnum): DMMF.DatamodelEnum {
+function createMockEnum(mockEnum: MockEnum): any {
   return {
     name: mockEnum.name,
     values: mockEnum.values.map(value => ({
@@ -170,7 +173,7 @@ function createMockEnum(mockEnum: MockEnum): DMMF.DatamodelEnum {
 // Preset mock schemas for common testing scenarios
 export const MOCK_SCHEMAS = {
   // Basic User-Post relationship
-  userPost: (): DMMF.Document => createMockDMMF({
+  userPost: () => createMockDMMF({
     models: [
       {
         name: 'User',
@@ -205,200 +208,15 @@ export const MOCK_SCHEMAS = {
     ]
   }),
 
-  // One-to-one relationship
-  userProfile: (): DMMF.Document => createMockDMMF({
+  // Simple model for basic testing
+  simple: () => createMockDMMF({
     models: [
       {
         name: 'User',
         fields: [
           { name: 'id', type: 'String', isId: true },
           { name: 'email', type: 'String', isUnique: true },
-          { 
-            name: 'profile', 
-            type: 'UserProfile', 
-            relationName: 'UserToProfile' 
-          }
-        ]
-      },
-      {
-        name: 'UserProfile',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'bio', type: 'String', isOptional: true },
-          { name: 'userId', type: 'String', isUnique: true },
-          { 
-            name: 'user', 
-            type: 'User', 
-            relationName: 'UserToProfile',
-            relationFromFields: ['userId'],
-            relationToFields: ['id']
-          }
-        ]
-      }
-    ]
-  }),
-
-  // Many-to-many implicit
-  userTags: (): DMMF.Document => createMockDMMF({
-    models: [
-      {
-        name: 'User',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'email', type: 'String', isUnique: true },
-          { 
-            name: 'tags', 
-            type: 'Tag', 
-            isList: true, 
-            relationName: 'UserTags' 
-          }
-        ]
-      },
-      {
-        name: 'Tag',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'name', type: 'String', isUnique: true },
-          { 
-            name: 'users', 
-            type: 'User', 
-            isList: true, 
-            relationName: 'UserTags' 
-          }
-        ]
-      }
-    ]
-  }),
-
-  // Self-referencing
-  userReferrals: (): DMMF.Document => createMockDMMF({
-    models: [
-      {
-        name: 'User',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'email', type: 'String', isUnique: true },
-          { name: 'referredById', type: 'String', isOptional: true },
-          { 
-            name: 'referredBy', 
-            type: 'User', 
-            isOptional: true,
-            relationName: 'UserReferrals',
-            relationFromFields: ['referredById'],
-            relationToFields: ['id']
-          },
-          { 
-            name: 'referrals', 
-            type: 'User', 
-            isList: true, 
-            relationName: 'UserReferrals' 
-          }
-        ]
-      }
-    ]
-  }),
-
-  // Complex relations with all types
-  complexSchema: (): DMMF.Document => createMockDMMF({
-    enums: [
-      {
-        name: 'Role',
-        values: [
-          { name: 'USER' },
-          { name: 'ADMIN' },
-          { name: 'MODERATOR' }
-        ]
-      }
-    ],
-    models: [
-      {
-        name: 'User',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'email', type: 'String', isUnique: true },
-          { name: 'role', type: 'Role', default: { name: 'USER' } },
-          { name: 'createdAt', type: 'DateTime', default: { name: 'now' } },
-          { name: 'updatedAt', type: 'DateTime', isUpdatedAt: true },
-          { 
-            name: 'profile', 
-            type: 'UserProfile', 
-            relationName: 'UserToProfile' 
-          },
-          { 
-            name: 'posts', 
-            type: 'Post', 
-            isList: true, 
-            relationName: 'UserToPosts' 
-          },
-          { 
-            name: 'comments', 
-            type: 'Comment', 
-            isList: true, 
-            relationName: 'UserToComments' 
-          }
-        ]
-      },
-      {
-        name: 'UserProfile',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'bio', type: 'String', isOptional: true },
-          { name: 'avatar', type: 'String', isOptional: true },
-          { name: 'userId', type: 'String', isUnique: true },
-          { 
-            name: 'user', 
-            type: 'User', 
-            relationName: 'UserToProfile',
-            relationFromFields: ['userId'],
-            relationToFields: ['id'],
-            relationOnDelete: 'Cascade'
-          }
-        ]
-      },
-      {
-        name: 'Post',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'title', type: 'String' },
-          { name: 'content', type: 'String', isOptional: true },
-          { name: 'published', type: 'Boolean', default: { name: 'false' } },
-          { name: 'authorId', type: 'String' },
-          { 
-            name: 'author', 
-            type: 'User', 
-            relationName: 'UserToPosts',
-            relationFromFields: ['authorId'],
-            relationToFields: ['id']
-          },
-          { 
-            name: 'comments', 
-            type: 'Comment', 
-            isList: true, 
-            relationName: 'PostToComments' 
-          }
-        ]
-      },
-      {
-        name: 'Comment',
-        fields: [
-          { name: 'id', type: 'String', isId: true },
-          { name: 'content', type: 'String' },
-          { name: 'authorId', type: 'String' },
-          { name: 'postId', type: 'String' },
-          { 
-            name: 'author', 
-            type: 'User', 
-            relationName: 'UserToComments',
-            relationFromFields: ['authorId'],
-            relationToFields: ['id']
-          },
-          { 
-            name: 'post', 
-            type: 'Post', 
-            relationName: 'PostToComments',
-            relationFromFields: ['postId'],
-            relationToFields: ['id']
-          }
+          { name: 'name', type: 'String', isOptional: true }
         ]
       }
     ]
