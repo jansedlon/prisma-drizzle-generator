@@ -21,7 +21,7 @@
     "test:all": "npm run test:unit && npm run test:integration && npm run test:types && npm run test:e2e",
     "test:ci": "vitest run --coverage --reporter=verbose",
     "prisma": "prisma",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "bun run build && prisma generate",
     "prisma:studio": "prisma studio",
     "docker:postgres": "docker run --name drizzle-test-postgres -e POSTGRES_PASSWORD=testpass -e POSTGRES_DB=testdb -p 5432:5432 -d postgres:15",
     "docker:mysql": "docker run --name drizzle-test-mysql -e MYSQL_ROOT_PASSWORD=testpass -e MYSQL_DATABASE=testdb -p 3306:3306 -d mysql:8",

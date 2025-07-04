@@ -342,9 +342,9 @@ export class SchemaParser {
             // Generate reverse 1:1 relation
             relations.push({
               type: "one",
-              foreignKeyTable: relatedModel.name,
+              foreignKeyTable: model.name,  // Fixed: should be current model, not related model
               foreignKeyField: correspondingField.relationFromFields![0]!,
-              referencedTable: model.name,
+              referencedTable: relatedModel.name,
               referencedField: correspondingField.relationToFields![0]!,
               relationName: field.name,
               isReverse: true,
