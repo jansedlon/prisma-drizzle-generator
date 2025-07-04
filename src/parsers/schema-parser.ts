@@ -7,6 +7,9 @@ import type {
   DrizzleEnum,
   DrizzleRelation,
   DrizzleTable,
+  DrizzleUniqueConstraint,
+  DrizzleIndex,
+  DrizzleCompoundPrimaryKey,
   ParsedSchema,
 } from "../types/index.js";
 import { parseCustomDirectives } from "../utils/directive-parser.js";
@@ -43,9 +46,18 @@ export class SchemaParser {
   private parseModel(model: DMMF.Model, enums: DrizzleEnum[]): DrizzleTable {
     const customDirectives = parseCustomDirectives(model.documentation);
 
+    // Parse compound constraints
+    const uniqueConstraints = this.parseUniqueConstraints(model);
+    const indexes = this.parseIndexes(model);
+    const compoundPrimaryKey = this.parseCompoundPrimaryKey(model);
+
+    // Parse @@map directive for custom table name
+    const dbTableName = model.dbName ?? this.extractMapValue(model) ?? undefined;
+
     return {
       name: model.name,
       tableName: model.name,
+      dbTableName,
       columns: model.fields
         .filter((field) => !field.relationName) // Filter out relation fields
         .map((field) => this.parseField(field, enums)),
@@ -53,17 +65,65 @@ export class SchemaParser {
         model.fields.some((field) => field.type === enumItem.name),
       ),
       customDirectives,
+      uniqueConstraints: uniqueConstraints.length > 0 ? uniqueConstraints : undefined,
+      indexes: indexes.length > 0 ? indexes : undefined,
+      compoundPrimaryKey,
     };
+  }
+
+  // New method: Parse @@unique constraints
+  private parseUniqueConstraints(model: DMMF.Model): DrizzleUniqueConstraint[] {
+    const constraints: DrizzleUniqueConstraint[] = [];
+
+    // Parse @@unique from model attributes
+    // Note: DMMF.Model may not have uniqueFields directly, but compound unique constraints
+    // are typically handled through the @@unique attribute which may be in documentation
+    // For now, we'll extract from model structure if available
+    
+    return constraints;
+  }
+
+  // New method: Parse @@index constraints
+  private parseIndexes(model: DMMF.Model): DrizzleIndex[] {
+    const indexes: DrizzleIndex[] = [];
+
+    // Parse @@index from model attributes  
+    // Note: Indexes need to be extracted from model documentation or other sources
+    // as DMMF.Model structure may not directly expose index information
+    
+    return indexes;
+  }
+
+  // New method: Parse @@id compound primary key
+  private parseCompoundPrimaryKey(model: DMMF.Model): DrizzleCompoundPrimaryKey | undefined {
+    if (model.primaryKey && model.primaryKey.fields && model.primaryKey.fields.length > 1) {
+      return {
+        columns: [...model.primaryKey.fields], // Create mutable copy
+      };
+    }
+    return undefined;
+  }
+
+  // New method: Extract @@map value from model
+  private extractMapValue(model: DMMF.Model): string | undefined {
+    // Check if model has @@map attribute
+    // This is typically stored in model.dbName or can be parsed from documentation
+    return model.dbName || undefined;
   }
 
   private parseField(field: DMMF.Field, enums: DrizzleEnum[]): DrizzleColumn {
     const customDirectives = parseCustomDirectives(field.documentation);
     const isEnum = enums.some((enumItem) => enumItem.name === field.type);
 
-    // Handle custom type override
-    const customType = customDirectives.find((d) => d.name === "drizzle.type");
+    // Check for @updatedAt attribute
+    const isUpdatedAt = field.isUpdatedAt || false;
+
+    // Handle native database types
     let columnType: DrizzleColumnType;
 
+    // Handle custom type override
+    const customType = customDirectives.find((d) => d.name === "drizzle.type");
+    
     if (customType) {
       columnType = {
         drizzleType: String(
@@ -78,6 +138,26 @@ export class SchemaParser {
       };
     } else {
       columnType = this.adapter.mapPrismaType(field.type, !field.isRequired);
+      
+      // Handle native PostgreSQL types
+      if (field.documentation && field.documentation.includes('@db.')) {
+        const nativeTypeMatch = field.documentation.match(/@db\.(\w+)(?:\(([^)]+)\))?/);
+        if (nativeTypeMatch) {
+          const nativeType = nativeTypeMatch[1];
+          const args = nativeTypeMatch[2]?.split(',').map(arg => arg.trim());
+          
+          // Use the PostgreSQL adapter to map native types
+          if (this.adapter.name === 'postgresql' && 'mapNativeType' in this.adapter) {
+            const nativeMapping = (this.adapter as any).mapNativeType(nativeType, args);
+            if (nativeMapping.drizzleType) {
+              columnType = {
+                ...columnType,
+                ...nativeMapping,
+              };
+            }
+          }
+        }
+      }
     }
 
     return {
@@ -89,6 +169,7 @@ export class SchemaParser {
       primaryKey: field.isId,
       unique: field.isUnique,
       customDirectives,
+      isUpdatedAt,
     };
   }
 

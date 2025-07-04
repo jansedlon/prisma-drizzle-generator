@@ -36,6 +36,29 @@ export class SchemaGenerator {
     
     if (needsSql) imports.add('sql');
 
+    // Check if we need defaultNow import for @default(now())
+    const needsDefaultNow = table.columns.some(col => col.defaultValue?.includes('defaultNow()'));
+    
+    if (needsDefaultNow) imports.add('defaultNow');
+
+    // Check if we need compound constraint imports
+    if (table.compoundPrimaryKey) {
+      imports.add('primaryKey');
+    }
+
+    if (table.uniqueConstraints && table.uniqueConstraints.length > 0) {
+      imports.add('unique');
+    }
+
+    if (table.indexes && table.indexes.length > 0) {
+      imports.add('index');
+    }
+
+    // Check if we need $onUpdate for @updatedAt fields
+    const needsOnUpdate = table.columns.some(col => col.isUpdatedAt);
+    
+    if (needsOnUpdate) imports.add('$onUpdate');
+
     // Add relation imports if needed
     if (table.columns.some((col) => col.type.importPath === "./enums.js")) {
       imports.add("pgEnum");
@@ -54,15 +77,39 @@ export class SchemaGenerator {
 
   private generateTableDefinition(table: DrizzleTable): string {
     const tableName = table.name;
-    const dbTableName = table.tableName;
+    const dbTableName = table.dbTableName || table.tableName;
 
     const tableStart = this.adapter.generateTableFunction(dbTableName);
     const columns = table.columns
       .map((col) => `  ${this.adapter.generateColumnDefinition(col)}`)
       .join(",\n");
 
+    // Generate compound constraints
+    const constraints: string[] = [];
+
+    // Add compound primary key if present
+    if (table.compoundPrimaryKey) {
+      constraints.push(`  ${this.adapter.generateCompoundPrimaryKey(table.compoundPrimaryKey)}`);
+    }
+
+    // Add unique constraints if present
+    if (table.uniqueConstraints && table.uniqueConstraints.length > 0) {
+      for (const constraint of table.uniqueConstraints) {
+        constraints.push(`  ${this.adapter.generateUniqueConstraint(constraint)}`);
+      }
+    }
+
+    // Add indexes if present
+    if (table.indexes && table.indexes.length > 0) {
+      for (const index of table.indexes) {
+        constraints.push(`  ${this.adapter.generateIndexDefinition(index)}`);
+      }
+    }
+
+    const constraintsString = constraints.length > 0 ? `,\n${constraints.join(",\n")}` : "";
+    
     const constName = this.getValidConstantName(this.toCamelCase(tableName));
-    return `export const ${constName} = ${tableStart}\n${columns}\n});`;
+    return `export const ${constName} = ${tableStart}\n${columns}${constraintsString}\n});`;
   }
 
   private toCamelCase(str: string): string {
