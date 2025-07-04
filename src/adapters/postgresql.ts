@@ -1,4 +1,3 @@
-import { logger } from "@prisma/internals";
 import type {
   DatabaseAdapter,
   DrizzleColumn,
@@ -8,6 +7,12 @@ import type {
   DrizzleIndex,
   DrizzleCompoundPrimaryKey,
 } from "../types/index.js";
+
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 
 export class PostgreSQLAdapter implements DatabaseAdapter {
   name = "postgresql";

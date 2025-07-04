@@ -1,0 +1,2913 @@
+generator client {
+  provider = "prisma-client-js"
+
+  moduleFormat        = "esm"
+  runtime             = "nodejs"
+  importFileExtension = "js"
+}
+
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
+generator drizzle {
+  provider                = "prisma-generator-drizzle"
+  output                  = "../../../flixy-drizzle/src/schema/main"
+  moduleResolution        = "NodeNext"
+  formatter               = "biome"
+  abortOnFailedFormatting = false
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SUBADMIN
+  USER
+  MEMBER
+}
+
+model User {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                        String                          @id @default(cuid())
+  email                     String                          @unique
+  username                  String?                         @unique
+  roles                     UserRole[]
+  role                      UserRole                        @default(USER)
+  password                  Password?
+  currency                  Currency?                       @relation(fields: [currencyCode], references: [code])
+  currencyCode              String?
+  name                      String
+  vat                       String?
+  localIdentificationNumber String?
+  phoneNumber               String?
+  stripeCustomerId          String?                         @unique
+  country                   Country?                        @relation(name: "UserToCountry", fields: [countryId], references: [id])
+  countryId                 String?
+  billingCountry            Country?                        @relation(name: "UserToCountryBilling", fields: [billingCountryId], references: [id])
+  billingCountryId          String?
+  activeLanguage            Language                        @relation(fields: [activeLanguageId], references: [id])
+  activeLanguageId          String
+  hasTrial                  Boolean                         @default(false)
+  stripeConnectAccountId    String?                         @unique
+  communityLayoutPreference MemberCommunityLayoutPreference @default(SIDEBAR)
+
+  /// [UserStripeDueRequirements_]
+  /// drizzle.type @flixydev/flixy-types/prisma::UserStripeDueRequirements
+  stripeCurrentlyDueRequirements Json?
+  stripeDetailsSubmitted         Boolean            @default(false)
+  dateOfBirth                    DateTime?
+  lastLoggedAt                   DateTime?
+  address                        Address?           @relation(fields: [addressId], references: [id])
+  addressId                      String?
+  invoicingSettings              InvoicingSettings?
+  profilePicture                 String?
+  bio                            String?
+  referrer                       User?              @relation("UserReferrer", fields: [referrerId], references: [id])
+  referrerId                     String?
+
+  /// Customer is only created if this user has made a purchase
+  /// with the same account email on someone else's store.
+  storeCustomers StoreCustomer[]
+
+  /// [UserSocialLinks_]
+  /// drizzle.type @flixydev/flixy-types/prisma::UserSocialLinks
+  socialLinks              Json?
+  saleInvoices             UserSaleInvoice[]
+  onboardingDepositSkipped Boolean           @default(false)
+  onboardingCompleted      Boolean           @default(false)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @default(now()) @updatedAt
+  deletedAt                DateTime?
+
+  /// [Preferences_]
+  /// drizzle.type @flixydev/flixy-types/prisma::Preferences
+  preferences Json @default("{}")
+
+  sessions                Session[]
+  subscriptions           Subscription[]
+  subscriptionInvoices    UserInvoice[]
+  notificationPreferences UserNotificationPreference[]
+  stores                  StoreToUser[]
+  authenticators          Authenticator[]
+  referredUsers           User[]                       @relation("UserReferrer")
+  referrerSettings        ReferrerSettings?
+  integrations            UsersOnServiceIntegrations[]
+  referrerIncomes         ReferrerIncomes[]
+  member                  Member?
+  feedback                Feedback[]
+  googleCalendarAccounts  GoogleCalendarAccount[]
+  googleCalendars         GoogleCalendar[]
+  featureFlags            UserFeatureFlag[]
+  invoices                Invoice[]
+  subscriptionsV2         UserSubscriptionProductV2[]
+
+  communities                    MemberToCommunity[]
+  posts                          Post[]
+  postLikes                      PostLike[]
+  comments                       PostComment[]
+  commentLikes                   CommentLike[]
+  chats                          MemberToChat[]
+  messages                       ChatMessage[]
+  courses                        MemberToCourse[]
+  courseSectionProgresses        MemberCourseSectionProgress[]
+  communityNotifications         CommunityNotification[]
+  events                         Event[]
+  notificationSettings           NotificationSetting[]
+  referrerIncomesReferee         ReferrerIncomes[]               @relation("ReferrerIncomesSourceUser")
+  issuedInvoices                 InvoiceV2[]                     @relation("IssuedInvoices")
+  receivedInvoices               InvoiceV2[]                     @relation("ReceivedInvoices")
+  invoiceNumberSeriesDefinitions InvoiceNumberSeriesDefinition[]
+  invoiceNumberSeriesAssignments InvoiceNumberSeriesAssignment[]
+  saleInvoiceCounters            UserSaleInvoiceCounter[]
+
+  @@index([roles], type: Gin)
+}
+
+model ReferrerSettings {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id               String  @id @default(cuid())
+  user             User    @relation(fields: [userId], references: [id])
+  userId           String  @unique
+  active           Boolean @default(false)
+  percentageReward Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model ReferrerIncomes {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                      String   @id @default(cuid())
+  user                    User     @relation(fields: [userId], references: [id])
+  userId                  String
+  sourceUser              User?    @relation(fields: [sourceUserId], references: [id], onDelete: SetNull, name: "ReferrerIncomesSourceUser")
+  sourceUserId            String?
+  sourceAmount            Int
+  destinationAmount       Int
+  sourceCurrency          Currency @relation(fields: [sourceCurrencyCode], references: [code], name: "ReferrerIncomesSourceCurrency")
+  sourceCurrencyCode      String
+  destinationCurrency     Currency @relation(fields: [destinationCurrencyCode], references: [code], name: "ReferrerIncomesDestinationCurrency")
+  destinationCurrencyCode String
+  conversionRate          Float?
+  stripeTransferId        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum NotificationChannel {
+  EMAIL
+}
+
+model NotificationPreference {
+  /// [NotificationPreferenceId_]
+  /// drizzle.type @flixydev/flixy-types/prisma::NotificationPreferenceId
+  id           String              @id
+  internalName String
+  channel      NotificationChannel @default(EMAIL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userSettings UserNotificationPreference[]
+}
+
+model UserNotificationPreference {
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId                   String
+  notificationPreference   NotificationPreference @relation(fields: [notificationPreferenceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  notificationPreferenceId String
+  enabled                  Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @default(now()) @updatedAt
+
+  @@unique([userId, notificationPreferenceId])
+}
+
+model Password {
+  hash String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId String @unique
+}
+
+model Session {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId         String
+  impersonatedBy String?
+  expirationDate DateTime
+}
+
+model Country {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id         String     @id @default(cuid())
+  name       String
+  localName  String
+  phone      Int?
+  currencies Currency[]
+  languages  String[]
+  flagEmoji  String
+  code       String     @unique @map("alpha2")
+  isEU       Boolean    @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  users                  User[]          @relation("UserToCountry")
+  usersBilling           User[]          @relation("UserToCountryBilling")
+  userInvoices           UserInvoice[]
+  addresses              Address[]
+  storeCustomers         StoreCustomer[]
+  issuerInvoices         InvoiceV2[]     @relation("IssuerInvoices")
+  customerInvoices       InvoiceV2[]     @relation("CustomerInvoices")
+  ossDestinationInvoices InvoiceV2[]     @relation("OSSDestinationInvoices")
+}
+
+model Language {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                     String                   @id @default(cuid())
+  nativeName             String
+  englishName            String
+  ISOTwoLetterCode       String                   @unique
+  inUse                  Boolean                  @default(false)
+  users                  User[]
+  currencyTranslations   CurrencyLocalization[]
+  productTranslations    ProductLocalization[]
+  storeThemeTranslations StoreThemeTranslations[]
+  invoices               Invoice[]
+  invoicesV2             InvoiceV2[]
+
+  @@index(inUse)
+  @@index(ISOTwoLetterCode)
+}
+
+model Verification {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// The type of verification, e.g. "email" or "phone"
+  type String
+
+  /// The thing we're trying to verify, e.g. a user's email or phone number
+  target String
+
+  /// The secret key used to generate the otp
+  secret String
+
+  /// The algorithm used to generate the otp
+  algorithm String
+
+  /// The number of digits in the otp
+  digits Int
+
+  /// The number of seconds the opt is valid for
+  period Int
+
+  /// The valid characters for the otp
+  charSet String
+
+  /// When it's safe to delete this verification
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([target, type])
+}
+
+model Authenticator {
+  // SQL: Encode to base64url then store as `TEXT` or a large `VARCHAR(511)`. Index this column
+  credentialID         String  @id
+  // Some reference to the user object. Consider indexing this column too
+  userId               String
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  // SQL: Encode to base64url and store as `TEXT`
+  credentialPublicKey  String
+  // SQL: Consider `BIGINT` since some authenticators return atomic timestamps as counters
+  counter              BigInt
+  // SQL: `VARCHAR(32)` or similar, longest possible value is currently 12 characters
+  // Ex: 'singleDevice' | 'multiDevice'
+  credentialDeviceType String
+  // SQL: `BOOL` or whatever similar type is supported
+  credentialBackedUp   Boolean
+  // SQL: `VARCHAR(255)` and store String array or a CSV String
+  // Ex: ['usb' | 'ble' | 'nfc' | 'internal']
+  transports           String
+}
+
+model Currency {
+  code          String   @id @unique
+  internalName  String
+  symbolNative  String
+  symbol        String
+  rounding      Float
+  decimalDigits Int
+  createdAt     DateTime @default(now())
+
+  translations                       CurrencyLocalization[]
+  productPricings                    ProductPricing[]
+  userInvoices                       UserInvoice[]
+  users                              User[]
+  countries                          Country[]
+  refererrIncomesSourceCurrency      ReferrerIncomes[]               @relation("ReferrerIncomesSourceCurrency")
+  refererrIncomesDestinationCurrency ReferrerIncomes[]               @relation("ReferrerIncomesDestinationCurrency")
+  storeProductsPrice                 StoreProductPrice[]
+  storeOrders                        StoreOrder[]
+  saleInvoices                       UserSaleInvoice[]
+  invoices                           Invoice[]
+  subscriptionPrices                 SubscriptionV2Price[]
+  subscriptionUsageBasedPrices       SubscriptionV2UsageBasedPrice[]
+  DiscountCode                       DiscountCode[]
+  invoicesV2                         InvoiceV2[]
+}
+
+model CurrencyLocalization {
+  name         String
+  language     Language @relation(fields: [languageId], references: [id])
+  languageId   String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+  currencyCode String
+  namePlural   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([languageId, currencyCode])
+}
+
+model Product {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                  String                 @id @default(cuid())
+  internalName        String
+  internalDescription String
+  pricings            ProductPricing[]
+  migrateToProductId  String?
+  migrateToProduct    SubscriptionV2Product? @relation(fields: [migrateToProductId], references: [id])
+  stripeProductId     String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @default(now()) @updatedAt
+
+  translations                 ProductLocalization[]
+  subscriptionPlans            SubscriptionPlan[]
+  subscriptionInvoiceLineItems UserInvoiceLineItem[]
+}
+
+model ProductLocalization {
+  name        String
+  description String
+  language    Language @relation(fields: [languageId], references: [id])
+  languageId  String
+  product     Product  @relation(fields: [productId], references: [id])
+  productId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([languageId, productId])
+}
+
+model ProductPricing {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                          String               @id @default(cuid())
+  product                     Product              @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productId                   String               @unique
+  fromDate                    DateTime
+  toDate                      DateTime
+  migrateToProductV2PricingId String?
+  migrateToProductV2Pricing   SubscriptionV2Price? @relation(fields: [migrateToProductV2PricingId], references: [id])
+  price                       Int
+  currency                    Currency             @relation(fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  currencyCode                String
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @default(now()) @updatedAt
+}
+
+model SubscriptionPlan {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id              String   @id @default(cuid())
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  productId       String
+  // Billing interval in months
+  billingInterval Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  subscriptions           Subscription[]
+  upgradedSubscriptions   Subscription[] @relation("UpgradedToPlan")
+  downgradedSubscriptions Subscription[] @relation("DowngradedToPlan")
+}
+
+enum SubscriptionInvoiceStatus {
+  DRAFT
+  UNPAID
+  PAID
+}
+
+model UserInvoice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id               String                     @id @default(cuid())
+  user             User                       @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: Restrict)
+  userId           String
+  stripeInvoiceId  String                     @unique
+  currency         Currency                   @relation(fields: [currencyCode], references: [code], onUpdate: NoAction, onDelete: Restrict)
+  currencyCode     String
+  amount           Int
+  status           String
+  subscription     Subscription?              @relation(fields: [subscriptionId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  subscriptionId   String?
+  subscriptionV2   UserSubscriptionProductV2? @relation(fields: [subscriptionV2Id], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  subscriptionV2Id String?
+  hidden           Boolean?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now()) @updatedAt
+  // billing reason
+  reason           String
+  lastPaymentError String?
+  // stripe hosted payment link
+  link             String?
+  // id               String                    @id @default(cuid())
+  // status           SubscriptionInvoiceStatus @default(UNPAID)
+  // invoiceNumber    String                    @unique
+  // stripeInvoiceId  String                    @unique
+  // customer         User                      @relation(fields: [customerId], references: [id], onUpdate: NoAction, onDelete: Restrict)
+  // customerId       String
+  // email            String
+  // name             String
+  // country          Country                   @relation(fields: [countryId], references: [id])
+  // countryId        String
+  // currency         Currency                  @relation(fields: [currencyCode], references: [code], onUpdate: NoAction, onDelete: Restrict)
+  // currencyCode     String
+  // address1         String
+  // address2         String?
+  // city             String
+  // postalCode       String
+  // phone            String?
+  // lastPaymentError String?
+  // invoiceDate      DateTime
+  // dueDate          DateTime
+  // paidAt           DateTime?
+  // subscription     Subscription              @relation(fields: [subscriptionId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  // subscriptionId   String
+  // createdAt        DateTime                  @default(now())
+  // updatedAt        DateTime                  @default(now()) @updatedAt
+
+  // lineItems UserInvoiceLineItem[]
+  Country             Country?              @relation(fields: [countryId], references: [id])
+  countryId           String?
+  UserInvoiceLineItem UserInvoiceLineItem[]
+}
+
+model UserInvoiceLineItem {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String      @id @default(cuid())
+  invoice       UserInvoice @relation(fields: [invoiceId], references: [id], onUpdate: NoAction, onDelete: Restrict)
+  invoiceId     String
+  product       Product     @relation(fields: [productId], references: [id], onUpdate: NoAction, onDelete: Restrict)
+  productId     String
+  lineAmount    Int         @default(0)
+  vatAmount     Int         @default(0)
+  vatPercentage Int         @default(0)
+  unitPrice     Int         @default(0)
+  quantity      Int         @default(1)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  PROVISIONED
+  ACTIVE
+  UPGRADED
+}
+
+model Subscription {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                              String            @id @default(cuid())
+  // active/past_due/canceled/unpaid...
+  status                          String
+  user                            User              @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  userId                          String
+  plan                            SubscriptionPlan  @relation(fields: [planId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  planId                          String
+  invoices                        UserInvoice[]
+  startsAt                        DateTime          @default(now())
+  endsAt                          DateTime
+  providerId                      String
+  renewedAt                       DateTime?
+  renewedSubscription             Subscription?     @relation("SubscriptionHistory", fields: [renewedSubscriptionId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  renewedSubscriptionId           String?           @unique
+  previousSubscription            Subscription?     @relation("SubscriptionHistory")
+  downgradedAt                    DateTime?
+  downgradedToPlan                SubscriptionPlan? @relation("DowngradedToPlan", fields: [downgradedToPlanId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  downgradedToPlanId              String?
+  upgradedAt                      DateTime?
+  upgradedToPlan                  SubscriptionPlan? @relation("UpgradedToPlan", fields: [upgradedToPlanId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  upgradedToPlanId                String?
+  cancelledAt                     DateTime?
+  failedPaymentNotificationSentAt DateTime?
+  createdAt                       DateTime          @default(now())
+  updatedAt                       DateTime          @default(now()) @updatedAt
+  deletedAt                       DateTime?
+
+  @@index([userId])
+}
+
+model Address {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id         String   @id @default(cuid())
+  address1   String?
+  address2   String?
+  city       String?
+  postalCode String?
+  state      String?
+  country    Country? @relation(fields: [countryId], references: [id])
+  countryId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  users             User[]
+  invoicingSettings InvoicingSettings?
+}
+
+enum StoreCustomDomainStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  FAILED
+}
+
+model Store {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                String      @id @default(cuid())
+  displayName       String
+  publicEmail       String
+  name              String
+  slug              String      @unique
+  legacySlug        String?
+  lastChangedSlugAt DateTime?
+  status            StoreStatus @default(PUBLISHED)
+  tos               String?
+  importCode        String?     @unique
+  tosEnabled        Boolean     @default(false)
+  gdpr              String?
+  gdprEnabled       Boolean     @default(false)
+  theme             StoreTheme  @relation(fields: [themeId], references: [id])
+  themeId           String
+
+  /// [StoreThemeConfig_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreThemeConfig
+  themeOverrides     Json
+  customDomain       String?                  @unique
+  customDomainStatus StoreCustomDomainStatus?
+  courses            Course[]
+
+  storeUsers         StoreToUser[]
+  pages              StorePage[]
+  orders             StoreOrder[]
+  customers          StoreCustomer[]
+  sections           StoreSection[]
+  fanSubscriptions   StoreProductSubscription[]
+  communities        Community[]
+  transactionReports TransactionsReport[]
+  funnels            Funnel[]
+  discountCodes      DiscountCode[]
+  storePageUrgency   StorePageUrgency[]
+
+  flixyStoreConfiguration AppConfiguration?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum StoreStatus {
+  PUBLISHED
+  INACTIVE
+}
+
+model StoreToUser {
+  storeId String
+  userId  String
+  store   Store  @relation(fields: [storeId], references: [id])
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@id([userId, storeId])
+  @@index([storeId])
+}
+
+model StorePage {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id         String  @id @default(cuid())
+  slug       String?
+  customSlug String?
+
+  // Name that user can customize and is visible only in store administration
+  internalName String?
+
+  orderPosition Int             @default(999)
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  storeId       String
+  url           String
+  product       StoreProduct?
+  status        StorePageStatus
+
+  /// [StorePagePreview_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StorePagePreview
+  preview                       Json?
+  submitTitle                   String?
+  showPriceDown                 Boolean @default(false)
+  hidePriceOnPreview            Boolean @default(false)
+  disableFloatingCheckoutButton Boolean @default(false)
+  disableCallToActionButton     Boolean @default(false)
+  bottomTitle                   String?
+  video                         String?
+  embededVideo                  String?
+  customerNotice                String?
+
+  /// [CustomerNoticeVariant_]
+  /// drizzle.type @flixydev/flixy-types/prisma::CustomerNoticeVariant
+  customerNoticeVariant String?
+
+  /// [StorePageFaq_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StorePageFaq
+  faq Json?
+
+  /// [StorePageAfterCheckoutData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StorePageAfterCheckoutData
+  afterCheckoutData Json?
+
+  funnelAcceptText  String?
+  funnelDeclineText String?
+
+  orders           StoreOrder[]
+  storePageUrgency StorePageUrgency[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+enum StorePageStatus {
+  PUBLISHED
+  DRAFT
+  UNLISTED
+  SPECIAL
+}
+
+enum StoreProductType {
+  CUSTOM_PRODUCT
+  LEAD_MAGNET
+  LINK
+  REFERRAL_LINK
+  DIGITAL_DOWNLOAD
+  MEETING
+  LANDING_PAGE
+  RECURRING_MEMBERSHIP
+  DIGITAL_COURSE
+  MULTI_PAGE_FUNNEL
+}
+
+model StoreProduct {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id          String           @id @default(cuid())
+  page        StorePage        @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pageId      String           @unique
+  title       String
+  description String
+  type        StoreProductType
+
+  /// [StoreProductLeadMagnet_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductLeadMagnet
+  leadMagnet Json?
+
+  /// [StoreProductDigitalDownload_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductDigitalDownload
+  digitalDownload Json?
+
+  /// [StoreProductEmails_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductEmails
+  emails  Json?
+  meeting Meeting?
+
+  /// [ProductQuestionsField_]
+  /// drizzle.type @flixydev/flixy-types/prisma::ProductQuestionsFields
+  productQuestions Json[]
+  price            StoreProductPrice?
+  customVatRate    Int?
+  image            String?
+
+  /// [StoreProductLink_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductLink
+  link Json?
+
+  /// [StoreProductReviews_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductReviews
+  reviews Json?
+
+  /// [StoreProductIntegrationData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductIntegrationData
+  integrationData Json?
+
+  /// [StoreProductLandingPage_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreProductLandingPage
+  landingPage             Json?
+  upSells                 StoreProductUpSell[]
+  postPurchaseCommunities String[]
+  postPurchaseCourses     String[]
+  stripeProductId         String?
+  stripePriceId           String?
+  subscriptions           StoreProductSubscription[]
+  trialPeriodDays         Int?
+  invoiceTitle            String?
+  courses                 Course[]
+  funnelStep              FunnelStep?
+
+  connectedFunnelId String?
+  connectedFunnel   Funnel?                      @relation(fields: [connectedFunnelId], references: [id])
+  discountCodes     DiscountCodeToStoreProduct[]
+
+  courseToCommunity       CourseToCommunity?
+  invoicesProductAppearOn InvoiceV2LineItem[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+}
+
+enum StoreProductUpSellType {
+  FILE
+  URL
+  NONE
+  COURSES
+}
+
+model StoreProductUpSell {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String                 @id @default(cuid())
+  product       StoreProduct           @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  productId     String
+  description   String
+  price         Int
+  customVatRate Int?
+  order         Int
+  type          StoreProductUpSellType
+  name          String
+
+  /// [UpSellBumpData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::UpSellBumpData
+  data Json
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+}
+
+model StoreProductPrice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String       @id @default(cuid())
+  product        StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  productId      String       @unique
+  amount         Int
+  currency       Currency     @relation(fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  currencyCode   String
+  discountAmount Int?
+}
+
+model Meeting {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                  String                    @id @default(cuid())
+  beforeBufferTime    Int?
+  afterBufferTime     Int?
+  attendeesLimit      Int
+  bookWithinNextNDays Int
+  durationMinutes     Int
+  meetingPrepHours    Int
+  timezone            String
+  availabilitySlots   MeetingAvailabilitySlot[]
+  product             StoreProduct              @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  productId           String                    @unique
+  bookings            MeetingBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum MeetingBookingStatus {
+  BOOKED
+  CANCELLED
+}
+
+model MeetingBooking {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String @id @default(cuid())
+  attendeesLimit Int
+
+  /// [MeetingBookingAttendee_]
+  /// drizzle.type @flixydev/flixy-types/prisma::MeetingBookingAttendee
+  attendees           Json[]
+  meeting             Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  meetingId           String
+  start               DateTime
+  end                 DateTime
+  afterBufferTime     Int?
+  beforeBufferTime    Int?
+  durationMinutes     Int?
+  meetingLink         String?
+  status              MeetingBookingStatus @default(BOOKED)
+  googleCalendarEvent GoogleCalendarEvent?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model MeetingAvailabilitySlot {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String  @id @default(cuid())
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  meetingId String
+  dayOfWeek Int
+
+  /// drizzle.dbType time
+  startTime DateTime @db.Time()
+
+  /// drizzle.dbType time
+  endTime DateTime @db.Time()
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([meetingId, dayOfWeek, startTime, endTime])
+}
+
+model StoreOrder {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String    @id @default(cuid())
+  store          Store     @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  storeId        String
+  page           StorePage @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  pageId         String
+  paymentGateway String
+  currency       Currency  @relation(fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  currencyCode   String
+  funnelSession  String?
+  // paymentGatewayFee Int
+  amount         Int
+  net            Int
+  customVatRate  Int?
+  ip             String?
+
+  storeCustomerId String
+  storeCustomer   StoreCustomer @relation(fields: [storeCustomerId], references: [id])
+
+  /// [StoreOrderData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreOrderData
+  data         Json
+  status       StoreOrderStatus
+  invoices     UserSaleInvoice[]
+  subscription StoreProductSubscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  funnel    Funnel?  @relation(fields: [funnelId], references: [id])
+  funnelId  String?
+
+  @@index([storeId, pageId])
+  @@index([storeCustomerId])
+}
+
+enum StoreOrderStatus {
+  FULFILLING
+  REFUNDED
+  COMPLETED
+}
+
+enum ServiceIntegrationName {
+  ECOMAIL
+  MAILER_LITE
+  FAKTUROID
+  SMART_EMAILING
+  FACEBOOK_PIXEL
+  FACEBOOK_CAPI
+  TRACKDESK
+  GOOGLE_CALENDAR
+}
+
+model ServiceIntegration {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id   String                 @id @default(cuid())
+  name ServiceIntegrationName @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  userIntegrations UsersOnServiceIntegrations[]
+}
+
+model StoreTheme {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id           String @id @default(cuid())
+  internalName String
+  code         String @unique
+
+  /// [StoreThemeConfig_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreThemeConfig
+  config Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  translations StoreThemeTranslations[]
+  stores       Store[]
+}
+
+model StoreThemeTranslations {
+  name       String
+  language   Language   @relation(fields: [languageId], references: [id])
+  languageId String
+  theme      StoreTheme @relation(fields: [themeId], references: [id])
+  themeId    String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @default(now()) @updatedAt
+
+  @@unique([languageId, themeId])
+}
+
+model UsersOnServiceIntegrations {
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId                 String
+  serviceIntegration     ServiceIntegration     @relation(fields: [serviceIntegrationName], references: [name], onDelete: Cascade, onUpdate: NoAction)
+  serviceIntegrationName ServiceIntegrationName
+  enabled                Boolean                @default(true)
+  settings               Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userId, serviceIntegrationName])
+}
+
+model StoreSection {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String @id @default(cuid())
+  store         Store  @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  storeId       String
+  orderPosition Int    @default(999)
+
+  /// [StoreSectionData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreSectionData
+  data Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum UserSaleInvoiceIssuer {
+  FLIXY
+  FAKTUROID
+}
+
+model UserSaleInvoice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id              String                @id @default(cuid())
+  issuerId        String?
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId          String
+  invoiceNumber   String?
+  currency        Currency              @relation(fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  currencyCode    String
+  order           StoreOrder?           @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orderId         String?
+  amount          Int
+  issuer          UserSaleInvoiceIssuer @default(FLIXY)
+  customerCountry String?
+
+  /// [UserSaleInvoiceStatus_]
+  /// drizzle.type @flixydev/flixy-types/prisma::UserSaleInvoiceStatus
+  status                String
+  correctionReason      String?
+  correctingInvoice     UserSaleInvoice? @relation("CorrectionInvoice", fields: [correctingInvoiceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  correctingInvoiceId   String?          @unique
+  correctedByInvoice    UserSaleInvoice? @relation("CorrectionInvoice")
+  location              String?
+  stripePaymentIntentId String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @default(now()) @updatedAt
+
+  @@unique([userId, invoiceNumber])
+}
+
+model UserSaleInvoiceCounter {
+  userId             String
+  user               User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currentNumber      String
+  serialNumberPrefix String @default("FL")
+
+  @@id([userId, serialNumberPrefix])
+}
+
+enum InvoicingSettingsLegalType {
+  SELF_EMPLOYED
+  COMPANY
+  NONE
+}
+
+model InvoicingSettings {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                 String                     @id @default(cuid())
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId             String                     @unique
+  address            Address?                   @relation(fields: [addressId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  addressId          String?                    @unique
+  registrationNumber String?
+  vatNumber          String?
+  taxPayer           Boolean                    @default(false)
+  footer             String?
+  vatRatePercentage  Int                        @default(0)
+  legalName          String?
+  legalType          InvoicingSettingsLegalType @default(NONE)
+  serialNumberPrefix String                     @default("FL")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model StoreProductSubscription {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                              String        @id @default(cuid())
+  productId                       String
+  storeCustomerId                 String
+  storeCustomer                   StoreCustomer @relation(fields: [storeCustomerId], references: [id])
+  storeId                         String
+  orderId                         String        @unique
+  stripePriceId                   String
+  stripeCustomerId                String
+  providerId                      String
+  boundedForCommunities           String[]
+  startsAt                        DateTime
+  endsAt                          DateTime
+  cancelledAt                     DateTime?
+  failedPaymentNotificationSentAt DateTime?
+  status                          String
+  trialPeriodDays                 Int?
+  afterTrialPeriodPrice           Int?
+
+  product StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  store   Store        @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  order   StoreOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index(stripeCustomerId)
+}
+
+enum MemberCommunityLayoutPreference {
+  SIDEBAR
+  TABS
+}
+
+model Member {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                        String                          @id @default(cuid())
+  email                     String                          @unique
+  user                      User                            @relation(fields: [userId], references: [id])
+  userId                    String                          @unique
+  name                      String
+  profilePicture            String?
+  bio                       String?
+  communityLayoutPreference MemberCommunityLayoutPreference @default(SIDEBAR)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  memberToCommunities     MemberToCommunity[]
+  posts                   Post[]
+  likes                   PostLike[]
+  postComments            PostComment[]
+  commentLikes            CommentLike[]
+  sessions                MemberSession[]
+  chats                   MemberToChat[]
+  messages                ChatMessage[]
+  courses                 MemberToCourse[]
+  courseSectionProgresses MemberCourseSectionProgress[]
+  communityNotifications  CommunityNotification[]
+}
+
+model MemberSession {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  memberId       String
+  expirationDate DateTime
+}
+
+enum CommunityMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model MemberToCommunity {
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  enabled                 Boolean             @default(true)
+  role                    CommunityMemberRole @default(MEMBER)
+  /// deprecated
+  allowEmailNotifications Boolean             @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  bannedAt  DateTime?
+
+  @@id([userId, communityId])
+}
+
+model CommunityInvitation {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id          String              @id @default(cuid())
+  communityId String
+  community   Community           @relation(fields: [communityId], references: [id])
+  email       String
+  name        String
+  role        CommunityMemberRole
+  expiresAt   DateTime
+  /// drizzle.type @flixydev/flixy-types/prisma::CommunityInvitationStatus
+  status      String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @default(now()) @updatedAt
+
+  @@unique([communityId, email])
+}
+
+model Community {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                          String              @id @default(cuid())
+  storeId                     String
+  name                        String
+  description                 String?
+  icon                        String?
+  membersCount                Int
+  banner                      String?
+  // Not deleted posts
+  activePostsCount            Int                 @default(0)
+  allowMembersToPost          Boolean             @default(true)
+  allowMembersPostToFeed      Boolean             @default(true)
+  allowMembersToSeeMembers    Boolean             @default(true)
+  allowMembersToChat          Boolean             @default(false)
+  canMessageCommunityOwner    Boolean             @default(true)
+  lastPostNotificationSentAt  DateTime?
+  store                       Store               @relation(fields: [storeId], references: [id])
+  coursesToCommunity          CourseToCommunity[]
+  profitAcceleratorCommunity_ AppConfiguration?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  members              MemberToCommunity[]
+  posts                Post[]
+  postCategories       CommunityPostCategory[]
+  invitations          CommunityInvitation[]
+  notificationSettings NotificationSetting[]
+
+  @@index([storeId])
+}
+
+model NotificationSetting {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  categoryId String?
+  category   CommunityPostCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  conversationId String?
+  conversation   Chat?   @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  /// [NotificationSettingChannels_]
+  /// drizzle.type @flixydev/flixy-types/prisma::NotificationSettingChannels
+  channels Json?
+
+  /// [NotificationSettingEventTypes_]
+  /// drizzle.type @flixydev/flixy-types/prisma::NotificationSettingEventTypes
+  eventTypes Json?
+
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([userId, communityId])
+}
+
+enum CommunityPostCategoryPermission {
+  ANYONE_WRITE
+  ADMINS_WRITE
+}
+
+model CommunityPostCategory {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                   String                          @id @default(cuid())
+  name                 String
+  position             Int                             @default(999)
+  communityId          String
+  community            Community                       @relation(fields: [communityId], references: [id])
+  permission           CommunityPostCategoryPermission
+  posts                Post[]
+  notificationSettings NotificationSetting[]
+  createdAt            DateTime                        @default(now())
+  deletedAt            DateTime?
+}
+
+model Post {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String                 @id @default(cuid())
+  community     Community              @relation(fields: [communityId], references: [id])
+  categoryId    String?
+  category      CommunityPostCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  communityId   String
+  title         String
+  content       String
+  attachments   PostAttachment[]
+  banner        String?
+  authorId      String?
+  author        Member?                @relation(fields: [authorId], references: [id])
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id])
+  pinnedAt      DateTime?
+  likesCount    Int                    @default(0)
+  commentsCount Int                    @default(0)
+
+  notificationSettings NotificationSetting[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  likes    PostLike[]
+  comments PostComment[]
+
+  @@index([communityId, createdAt(sort: Desc), categoryId])
+  @@index([userId])
+}
+
+model PostAttachment {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id       String  @id @default(cuid())
+  // image, file, video, embed
+  type     String
+  // S3 location or URL
+  location String
+  size     Int?
+  filename String?
+  post     Post?   @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  postId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([postId])
+}
+
+model PostLike {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id       String  @id @default(cuid())
+  postId   String
+  post     Post    @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id])
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([postId, createdAt(sort: Desc)])
+}
+
+model PostComment {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id              String        @id @default(cuid())
+  content         String
+  postId          String
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  memberId        String?
+  member          Member?       @relation(fields: [memberId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  parentCommentId String?
+  parentComment   PostComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  replies         PostComment[] @relation("CommentReplies")
+  likes           CommentLike[]
+  repliesCount    Int           @default(0)
+  likesCount      Int           @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  // There is an index in migrations which cannot be specified here
+  // ON "PostComment"("postId", "createdAt" DESC) WHERE "parentCommentId" IS NULL;
+  @@index([parentCommentId, createdAt(sort: Asc)])
+}
+
+model CommentLike {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String      @id @default(cuid())
+  commentId String
+  comment   PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  memberId  String?
+  member    Member?     @relation(fields: [memberId], references: [id])
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
+  @@index([commentId, createdAt(sort: Desc)])
+}
+
+model Chat {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id    String @id @default(cuid())
+  title String
+
+  createdAt DateTime @default(now())
+
+  participants         MemberToChat[]
+  messages             ChatMessage[]
+  notificationSettings NotificationSetting[]
+}
+
+model MemberToChat {
+  memberId            String?
+  member              Member?   @relation(fields: [memberId], references: [id])
+  userId              String
+  user                User      @relation(fields: [userId], references: [id])
+  chatId              String
+  chat                Chat      @relation(fields: [chatId], references: [id])
+  unreadMessagesCount Int       @default(0)
+  lastSeenAt          DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, chatId])
+}
+
+model ChatMessage {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String            @id @default(cuid())
+  chatId    String
+  chat      Chat              @relation(fields: [chatId], references: [id])
+  memberId  String?
+  member    Member?           @relation(fields: [memberId], references: [id])
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  content   String
+  documents MessageDocument[]
+
+  notificationSentAt DateTime?
+  createdAt          DateTime  @default(now())
+
+  @@index([chatId, createdAt(sort: Desc)])
+}
+
+model MessageDocument {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String      @id @default(cuid())
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id])
+
+  /// [ChatDocumentMetadata_]
+  /// drizzle.type @flixydev/flixy-types/prisma::ChatDocumentMetadata
+  metadata Json
+  location String?
+
+  createdAt DateTime @default(now())
+
+  @@index(messageId)
+}
+
+model CourseInvitation {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id               String          @id @default(cuid())
+  courseId         String
+  course           Course          @relation(fields: [courseId], references: [id])
+  email            String
+  name             String
+  expiresAt        DateTime
+  /// drizzle.type @flixydev/flixy-types/prisma::CourseInvitationStatus
+  status           String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+  memberToCourse   MemberToCourse? @relation(fields: [memberToCourseId], references: [id])
+  memberToCourseId String?
+
+  @@unique([courseId, email])
+}
+
+model Course {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                  String  @id @default(cuid())
+  title               String
+  summary             String
+  icon                String?
+  banner              String?
+  introductionTitle   String?
+  introductionContent String?
+  introductionVideo   String?
+
+  /// [CourseSectionAttachment_]
+  /// drizzle.type @flixydev/flixy-types/prisma::CourseSectionAttachment
+  introductionResources Json[]
+  storeProduct          StoreProduct?                 @relation(fields: [storeProductId], references: [id])
+  storeProductId        String?
+  store                 Store                         @relation(fields: [storeId], references: [id])
+  storeId               String
+  modules               CourseModule[]
+  courseToCommunities   CourseToCommunity[]
+  membersToCourse       MemberToCourse[]
+  progress              MemberCourseSectionProgress[]
+  invitations           CourseInvitation[]
+  deletedAt             DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum CourseToCommunityAccessType {
+  FREE
+  PAID
+}
+
+model CourseToCommunity {
+  courseId    String
+  communityId String
+
+  accessType CourseToCommunityAccessType @default(FREE)
+
+  storeProductId String?       @unique
+  storeProduct   StoreProduct? @relation(fields: [storeProductId], references: [id])
+
+  course    Course    @relation(fields: [courseId], references: [id])
+  community Community @relation(fields: [communityId], references: [id])
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@id([courseId, communityId])
+}
+
+enum MemberToCourseAccessedFrom {
+  PURCHASE
+  COMMUNITY
+}
+
+model MemberToCourse {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id           String                     @id @default(cuid())
+  memberId     String?
+  courseId     String
+  member       Member?                    @relation(fields: [memberId], references: [id])
+  userId       String
+  user         User                       @relation(fields: [userId], references: [id])
+  course       Course                     @relation(fields: [courseId], references: [id])
+  enabled      Boolean                    @default(true)
+  accessedFrom MemberToCourseAccessedFrom
+  invitations  CourseInvitation[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+enum CourseModuleStatus {
+  PUBLISHED
+  DRAFT
+}
+
+model CourseModule {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id       String             @id @default(cuid())
+  title    String
+  course   Course             @relation(fields: [courseId], references: [id])
+  courseId String
+  status   CourseModuleStatus
+  position Int
+  sections CourseSection[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+}
+
+enum CourseSectionStatus {
+  PUBLISHED
+  DRAFT
+}
+
+model CourseSection {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String              @id @default(cuid())
+  status    CourseSectionStatus
+  title     String
+  content   String
+  videoLink String?
+  position  Int
+
+  /// [CourseSectionAttachment_]
+  /// drizzle.type @flixydev/flixy-types/prisma::CourseSectionAttachment
+  attachments Json[]
+  module      CourseModule                  @relation(fields: [moduleId], references: [id])
+  moduleId    String
+  progress    MemberCourseSectionProgress[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+}
+
+model MemberCourseSectionProgress {
+  courseId  String
+  sectionId String
+  memberId  String?
+
+  completedAt DateTime?
+
+  course  Course        @relation(fields: [courseId], references: [id])
+  section CourseSection @relation(fields: [sectionId], references: [id])
+  member  Member?       @relation(fields: [memberId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([courseId, sectionId, userId])
+}
+
+model Feedback {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id          String  @id @default(cuid())
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId      String
+  title       String
+  description String?
+
+  createdAt DateTime @default(now())
+}
+
+// Recurring event instances that are exceptions to the rule
+model GoogleCalendarEventException {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                    String              @id @default(cuid())
+  opaqueId              String
+  recurringEventId      String
+  status                String
+  googleCalendarEvent   GoogleCalendarEvent @relation(fields: [googleCalendarEventId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  googleCalendarEventId String
+  // Other fields are optional, as they are not always present in the exception (recurrence instance)
+  iCalUID               String?
+  start                 DateTime?
+  startTimezone         String?
+  end                   DateTime?
+  endTimezone           String?
+  originalStartTime     DateTime?
+  originalTimezone      String?
+  title                 String?
+  description           String?
+  visibility            String?
+  eventType             String?
+  location              String?
+  created               DateTime?
+  updated               DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @default(now()) @updatedAt
+
+  @@unique([googleCalendarEventId, opaqueId])
+}
+
+model GoogleCalendarEvent {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id               String                         @id @default(cuid())
+  // Event unique identifier across google calendaring systems. But in our representation, it's unique only per calendar
+  iCalUID          String
+  // Recurring events, all occurrences of one event have different ids while they all share the same iCalUIDs
+  // Opaque google identifier of the event. Writable
+  opaqueId         String
+  start            DateTime
+  startTimezone    String
+  end              DateTime
+  endTimezone      String
+  status           String
+  title            String
+  description      String?
+  eventType        String
+  location         String?
+  visibility       String?
+  recurrence       String[]                       @default([])
+  recurrenceUntil  DateTime?
+  created          DateTime
+  updated          DateTime
+  calendar         GoogleCalendar                 @relation(fields: [calendarId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  calendarId       String
+  meetingBooking   MeetingBooking?                @relation(fields: [meetingBookingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  meetingBookingId String?                        @unique
+  exceptions       GoogleCalendarEventException[]
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @default(now()) @updatedAt
+
+  @@unique([calendarId, iCalUID])
+}
+
+model GoogleCalendar {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                       String                @id @default(cuid())
+  googleCalendarId         String
+  summary                  String
+  description              String?
+  timezone                 String
+  channelId                String?               @unique
+  resourceId               String?
+  expiration               DateTime?
+  accessRole               String
+  selected                 Boolean               @default(false)
+  primary                  Boolean               @default(false)
+  selectedForEventCreation Boolean               @default(false)
+  selectedForConflictCheck Boolean               @default(false)
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId                   String
+  account                  GoogleCalendarAccount @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  accountId                String
+  googleCalendarEvents     GoogleCalendarEvent[]
+  nextSyncToken            String?
+  lastSyncedAt             DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @default(now()) @updatedAt
+
+  @@unique([userId, googleCalendarId])
+  @@unique([channelId, resourceId])
+}
+
+enum GoogleCalendarAccountStatus {
+  SYNCHRONIZING
+  SYNCHRONIZED
+  ERROR
+}
+
+model GoogleCalendarAccount {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                             String                      @id @default(cuid())
+  //
+  // An identifier for the user, unique among all Google accounts and never
+  // reused. A Google account can have multiple emails at different points in
+  // time, but the sub value is never changed. Use sub within your application
+  // as the unique-identifier key for the user.
+  //
+  sub                            String                      @unique
+  // accessToken  String
+  refreshToken                   String
+  scopes                         String[]
+  /// [GoogleCalendarAccountData_]
+  userData                       Json
+  googleCalendarAccountCalendars GoogleCalendar[]
+  lastSyncedAt                   DateTime
+  nextSyncToken                  String
+  user                           User                        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userId                         String
+  status                         GoogleCalendarAccountStatus @default(SYNCHRONIZED)
+  createdAt                      DateTime                    @default(now())
+  updatedAt                      DateTime                    @default(now()) @updatedAt
+}
+
+enum InvoiceType {
+  FLIXY_FEE_INVOICE
+  STRIPE_FEE_INVOICE
+  TRANSFERS_INVOICE
+  FLIXY_SUBSCRIPTION_INVOICE
+}
+
+model Invoice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                                String               @id @default(cuid())
+  type                              InvoiceType
+  languageId                        String?
+  language                          Language?            @relation(fields: [languageId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invoiceNumber                     String
+  // Dates
+  issueDate                         DateTime
+  transactionDate                   DateTime?
+  paymentDate                       DateTime?
+  dueDate                           DateTime?
+  serviceDate                       DateTime?
+  // Supplier
+  supplierVat                       String?
+  supplierName                      String
+  supplierEmail                     String?
+  supplierAddressLine1              String?
+  supplierAddressLine2              String?
+  supplierCity                      String?
+  supplierPostalCode                String?
+  supplierCountry                   String?
+  supplierLocalIdentificationNumber String?
+  foreignCurrencyRate               Float?
+  // Customer
+  customerVat                       String?
+  customerName                      String
+  customerEmail                     String?
+  customerAddressLine1              String?
+  customerAddressLine2              String?
+  customerCity                      String?
+  customerPostalCode                String?
+  customerCountry                   String?
+  customerLocalIdentificationNumber String?
+  userId                            String?
+  user                              User?                @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  totalAmount                       Float
+  totalTaxAmount                    Float
+  currencyCode                      String
+  currency                          Currency             @relation(fields: [currencyCode], references: [code], onDelete: Cascade, onUpdate: NoAction)
+  // Tax Rate in %
+  taxRate                           Float
+  // Sum of all line items which are taxable
+  taxableAmount                     Float
+  // Final tax amount
+  taxAmount                         Float
+  publicLocation                    String?
+  privateLocation                   String?
+  lineItems                         InvoiceLineItem[]
+  customFields                      InvoiceCustomField[]
+  viesCheck                         ViesCheckOld?        @relation(fields: [viesCheckId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  viesCheckId                       String?
+  createdAt                         DateTime             @default(now())
+  updatedAt                         DateTime             @default(now()) @updatedAt
+}
+
+model InvoiceCustomField {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String   @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  fieldName     String
+  value         String
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceCustomFieldRenderSection
+  renderSection String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+}
+
+model InvoiceLineItem {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id           String   @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  quantity     Int
+  quantityUnit String
+  description  String
+  price        Float
+  taxRate      Int
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceLineItemTaxMode
+  taxMode      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
+model InvoiceCounter {
+  id                 String
+  currentNumber      String
+  serialNumberPrefix String
+
+  @@id([id, serialNumberPrefix])
+}
+
+enum TransactionsReportStatus {
+  PENDING
+  STARTED
+  GENERATED
+  FAILED
+}
+
+model TransactionsReport {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id             String                   @id @default(cuid())
+  storeId        String
+  store          Store                    @relation(fields: [storeId], references: [id])
+  payoutId       String?
+  location       String?
+  publicLocation String?
+  status         TransactionsReportStatus @default(PENDING)
+  finishedAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @default(now()) @updatedAt
+
+  @@index([storeId, createdAt(sort: Desc)])
+}
+
+/// @deprecated
+model ViesCheckOld {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                       String    @id @default(cuid())
+  vatNumber                String?
+  countryCode              String?
+  requesterNumber          String?
+  requesterMemberStateCode String?
+  requestIdentifier        String?
+  isValid                  Boolean
+  createdAt                DateTime  @default(now())
+  invoices                 Invoice[]
+
+  @@map("ViesCheck")
+}
+
+model ViesCheck {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// The VAT number that was checked
+  checkedVatNumber   String
+  /// The country code for which the VAT number was checked
+  checkedCountryCode String
+
+  /// Was the VAT number found to be valid by VIES?
+  isValid Boolean
+  /// The name associated with the VAT number, if returned by VIES
+  name    String?
+  /// The address associated with the VAT number, if returned by VIES
+  address String?
+
+  /// Timestamp of when the check was performed
+  checkedAt         DateTime @default(now())
+  /// The raw response from the VIES service, for auditing or debugging
+  rawResponse       Json?
+  requestIdentifier String?
+
+  invoices InvoiceV2[]
+
+  @@index([checkedVatNumber, checkedCountryCode])
+  @@index([requestIdentifier])
+  @@map("ViesCheckV2")
+}
+
+enum FeatureFlagType {
+  USER_APPROVED
+  PERCENTAGE_ROLLOUT
+}
+
+model FeatureFlag {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                String          @id @default(cuid())
+  name              String          @unique
+  description       String?
+  type              FeatureFlagType
+  enabled           Boolean         @default(false)
+  rolloutPercentage Int?
+
+  userFeatureFlags UserFeatureFlag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model UserFeatureFlag {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  featureFlagId String
+  featureFlag   FeatureFlag @relation(fields: [featureFlagId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userId, featureFlagId])
+}
+
+model CommunityNotification {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id        String                    @id @default(cuid())
+  memberId  String?
+  member    Member?                   @relation(fields: [memberId], references: [id])
+  userId    String
+  user      User                      @relation(fields: [userId], references: [id])
+  type      CommunityNotificationType
+  /// [CommunityNotificationEvent_]
+  /// drizzle.type @flixydev/flixy-types/prisma::CommunityNotificationEvent
+  payload   Json
+  sentAt    DateTime?
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @default(now()) @updatedAt
+
+  @@index([createdAt(sort: Desc)])
+}
+
+enum CommunityNotificationType {
+  NEW_POST
+  NEW_COMMENT
+  REPLY_COMMENT
+  MENTION
+  UNREAD_MESSAGES
+}
+
+model UmzugMigration {
+  migrationName String   @id
+  ranAt         DateTime
+}
+
+enum DiscountCodeType {
+  PERCENTAGE
+  AMOUNT
+}
+
+model DiscountCode {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id          String  @id @default(cuid())
+  code        String
+  name        String
+  description String?
+
+  discountAmount Int
+  currency       Currency @relation(fields: [currencyCode], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  currencyCode   String
+
+  discountType DiscountCodeType
+
+  validFrom   DateTime
+  validUntil  DateTime?
+  isActive    Boolean   @default(true)
+  allProducts Boolean   @default(false)
+
+  maxUses Int?
+  uses    Int  @default(0)
+
+  codeToProducts DiscountCodeToStoreProduct[]
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  // There is an index in migrations which cannot be specified here
+  // UNIQUE ON "DiscountCode"("storeId", "code") WHERE "deletedAt" IS NULL;
+}
+
+model DiscountCodeToStoreProduct {
+  discountCodeId String
+  discountCode   DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productId      String
+  product        StoreProduct @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([discountCodeId, productId])
+}
+
+/// Customer is a person who has made a purchase
+/// on a any of our stores.
+model Customer {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id              String  @id @default(cuid())
+  name            String?
+  email           String  @unique
+  phone           String?
+  preferredLocale String?
+
+  storeCustomers StoreCustomer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+/// Since a customer is a person, the person might have purchased
+/// from multiple stores. Each store is a different Stripe account
+/// and data are isolated. This means we need to have M:N relation
+/// between Store and Customer.
+model StoreCustomer {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  stripeCustomerId String?
+  /// [StoreCustomerIntegrationData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StoreCustomerIntegrationData
+  integrationData  Json?
+  name             String?
+  email            String
+  phone            String?
+  preferredLocale  String?
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  orders        StoreOrder[]
+  subscriptions StoreProductSubscription[]
+  country       Country?                   @relation(fields: [countryCode], references: [code])
+  countryCode   String?
+  invoicesV2    InvoiceV2[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // @@unique([storeId, customerId])
+  @@unique([storeId, email])
+  @@index([email])
+}
+
+model StorePageUrgency {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id      String @id @default(cuid())
+  /// [StorePageUrgency_]
+  /// drizzle.type @flixydev/flixy-types/prisma::StorePageUrgency
+  urgency Json
+
+  storePageId String
+  storePage   StorePage @relation(fields: [storePageId], references: [id])
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // So we do not do this, because in future our customer might want to have multiple urgencies for the same page
+  // There is an index in migrations which cannot be specified here
+  // UNIQUE ON "StorePageUrgency"("storeId", "storePageId") WHERE "deletedAt" IS NULL;
+}
+
+
+// ===== From app-configuration.prisma =====
+model AppConfiguration {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    afterSignupSubscriptionPriceId String?              @unique
+    afterSignupSubscriptionPrice   SubscriptionV2Price? @relation(name: "afterSignupSubscriptionPrice", fields: [afterSignupSubscriptionPriceId], references: [id])
+
+    flixyStoreId String? @unique
+    flixyStore   Store?  @relation(fields: [flixyStoreId], references: [id])
+
+    profitAcceleratorProductIds  String[]
+    profitAcceleratorCommunityId String?    @unique
+    profitAcceleratorCommunity   Community? @relation(fields: [profitAcceleratorCommunityId], references: [id])
+
+    profitAcceleratorProPostCategories String[]
+
+    profitAcceleratorProBetaProductId String?                @unique
+    profitAcceleratorProBetaProduct   SubscriptionV2Product? @relation(fields: [profitAcceleratorProBetaProductId], references: [id])
+
+    allowedPricesToUpgradeToProfitAcceleratorPro String[]
+    profitAcceleratorProCourses                  String[]
+
+    // This is the Flixy Pro price that has 0 CZK price because
+    // it's immediately cancelled after purchase and changed to regular Flixy Pro price
+    profitAcceleratorFreeSubscriptionPriceId String?              @unique
+    profitAcceleratorFreeSubscriptionPrice   SubscriptionV2Price? @relation(name: "profitAcceleratorFreeSubscriptionPrice", fields: [profitAcceleratorFreeSubscriptionPriceId], references: [id])
+
+    profitAcceleratorWebinarCourses String[]
+
+    profitAcceleratorCoursesPriceId String? @unique
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+}
+
+// ===== From blacklist.prisma =====
+model Blacklist {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id               String   @id @default(cuid())
+    /// drizzle.type @flixydev/flixy-types/prisma::BlacklistType
+    type             String
+    value            String
+    active           Boolean  @default(true)
+    registerAttempts Int      @default(0)
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @default(now()) @updatedAt
+
+    @@index([type, value])
+}
+
+// ===== From email.prisma =====
+model Email {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    subject     String
+    from        String
+    to          String
+    bodyPreview String?
+
+    providerId  String?     @unique
+    provider    String
+    status      EmailStatus
+    sentAt      DateTime?
+    deliveredAt DateTime?
+
+    events EmailEvent[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([createdAt(sort: Desc)])
+}
+
+enum EmailStatus {
+    SENT
+    FAILED
+}
+
+model EmailEvent {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    emailId String
+    email   Email  @relation(fields: [emailId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+    eventType EmailEventType
+    detail    Json?
+
+    bounceType        String?
+    bounceSubType     String?
+    bounceMessage     String?
+    complaintFeedback String?
+
+    eventTimestamp DateTime
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([emailId, eventTimestamp])
+}
+
+enum EmailEventType {
+    SENT
+    DELIVERED
+    BOUNCED
+    COMPLAINT
+    OPENED
+    CLICKED
+}
+
+model SuppressionList {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    email String @unique
+
+    type          SuppressionListType
+    reason        String?
+    bounceSubType String?
+
+    softBounceCount Int       @default(0)
+    lastBounceAt    DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+enum SuppressionListType {
+    HARD_BOUNCE
+    SOFT_BOUNCE
+    COMPLAINT
+    MANUAL
+    // Not used
+    SUPPRESSION_LIST
+}
+
+// ===== From event.prisma =====
+model Event {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    user   User?   @relation(fields: [userId], references: [id])
+    userId String?
+
+    name        String
+    data        Json
+    resource    String?
+    description String?
+
+    createdAt DateTime @default(now())
+}
+
+// ===== From funnel.prisma =====
+enum FunnelStatus {
+    DRAFT
+    ACTIVE
+    ARCHIVED
+}
+
+model Funnel {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id            String         @id @default(cuid())
+    name          String
+    storeId       String
+    store         Store          @relation(fields: [storeId], references: [id])
+    entryProducts StoreProduct[]
+    status        FunnelStatus   @default(ACTIVE)
+    steps         FunnelStep[]
+    orders        StoreOrder[]
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @default(now()) @updatedAt
+    deletedAt     DateTime?
+}
+
+model FunnelStep {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id                String       @id @default(cuid())
+    isEntryPoint      Boolean      @default(false)
+    funnelId          String
+    funnel            Funnel       @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+    productId         String       @unique
+    product           StoreProduct @relation(fields: [productId], references: [id])
+    nextStepAcceptId  String?
+    nextStepAccept    FunnelStep?  @relation(fields: [nextStepAcceptId], references: [id], name: "FunnelStepNextStepAccept")
+    nextStepDeclineId String?
+    nextStepDecline   FunnelStep?  @relation(fields: [nextStepDeclineId], references: [id], name: "FunnelStepNextStepDecline")
+    orderPosition     Int          @default(999)
+    previousSteps1    FunnelStep[] @relation("FunnelStepNextStepAccept")
+    previousSteps2    FunnelStep[] @relation("FunnelStepNextStepDecline")
+    createdAt         DateTime     @default(now())
+    updatedAt         DateTime     @default(now()) @updatedAt
+    deletedAt         DateTime?
+}
+
+// ===== From invoice.prisma =====
+enum InvoiceV2Type {
+  FLIXY_PRODUCT_PURCHASE
+  FLIXY_SUBSCRIPTION
+  FLIXY_PLATFORM_FEE
+  STRIPE_TRANSACTION_FEE
+  USER_REFERRAL_PAYOUT
+  STORE_SALE
+  STORE_REFUND
+  MANUAL
+}
+
+enum InvoiceV2DocumentType {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PROFORMA_INVOICE
+  ADVANCE_INVOICE
+  CREDIT_NOTE_FOR_ADVANCE_INVOICE
+  SIMPLIFIED_TAX_DOCUMENT
+}
+
+enum InvoiceV2LifecycleStatus {
+  /// Koncept. Faktura ještě nemá přidělené finální číslo.
+  /// Lze ji volně editovat a mazat.
+  /// Tento stav by se používal pro faktury, které si uživatel "rozpracuje" v UI.
+  DRAFT
+
+  /// Čeká na vystavní. Faktuře již bylo přiděleno finální číslo,
+  /// ale ještě nebyly vygenerovány dokumenty (PDF/ISDOC) nebo nebyla odeslána
+  /// do externího systému. Data faktury jsou již "zamrzlá" a neměla by se měnit.
+  /// Toto je stav, ve kterém se faktura nachází po volání `InvoiceCreateService` nebo `InvoiceManagementService`
+  PENDING_ISSUE
+
+  /// Vystaveno. Faktura je finální a neměnná.
+  /// Tento stav nastáváa po úspěšném vygenerování PDF/ISDOC nebo po úspěšné synchronizaci s externím systémem
+  ISSUED
+
+  /// Faktura byla stornována. Konečný stav
+  VOIDED
+
+  /// K faktuře byl vytvořen opravný doklad. Konečný stav
+  CORRECTED
+}
+
+enum InvoiceV2PaymentStatus {
+  /// Čeká na platbu
+  UNPAID
+
+  /// Plně zaplaceno
+  PAID
+
+  /// Částečně zaplaceno
+  PARTIALLY_PAID
+
+  /// Po splatnosti
+  OVERDUE
+
+  /// Refundování (částečně nebo plně)
+  REFUNDED
+}
+
+enum IssuerType {
+  /// Flixy s.r.o.
+  FLIXY
+  /// Uživtel Flixy
+  USER
+  /// Externí entita (např. Stripe pro jejich poplatky)
+  EXTERNAL
+  /// Manuální vystavení ve Flixy
+  MANUAL
+}
+
+enum TaxScheme {
+  /// Tuzemské plnění
+  DOMESTIC
+  /// One Stop Shop (prodej digitálních služeb B2C v rámci EU)
+  OSS_EU
+  /// Přenesená daňová povinnost (typicky B2B v EU)
+  REVERSE_CHARGE_EU
+  /// Vývoz mimo EU
+  EXPORT_OUTSIDE_EU
+  /// Osvobozeno od DPH (jiný důvod než export/OSS)
+  EXEMPT
+  /// Mimo předmět daně
+  OUT_OF_SCOPE
+}
+
+enum TaxClassification {
+  /// Standardní sazba
+  STANDARD
+  /// První snížená sazba
+  REDUCED_LOWER
+  /// Druhá snížená sazba (pokud existuje v dané zemi)
+  REDUCED_UPPER
+  /// Nulová sazba (např. knihy v některých zemích)
+  ZERO_RATE
+  /// Osvobozeno od DPH
+  EXEMPT
+  /// Mimo předmět daně
+  OUT_OF_SCOPE
+}
+
+enum SourceEntityType {
+  STRIPE_PLATFORM_INVOICE
+  STORE_ORDER
+  MANUAL_INPUT
+}
+
+model InvoiceV2 {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Unikátní ID faktury, které se používá pro generování ISDOC
+  uuid String @unique
+
+  /// Unikátní v kontextu vystavovatele, typu a roku (např. FLIXY-2024-001, USER123-SALE-2024-001)
+  invoiceNumber String
+
+  type          InvoiceV2Type
+  documentType  InvoiceV2DocumentType
+  status        InvoiceV2LifecycleStatus @default(DRAFT)
+  paymentStatus InvoiceV2PaymentStatus   @default(UNPAID)
+  languageCode  String
+  language      Language                 @relation(fields: [languageCode], references: [ISOTwoLetterCode])
+
+  /// Datum vystavení
+  issueDate    DateTime
+  /// Datum splatnosti
+  dueDate      DateTime?
+  /// Datum úhrady
+  paymentDate  DateTime?
+  /// Datum zdaňovacího období (DUZP)
+  taxPointDate DateTime?
+
+  // --- Vystavoval (Issuer) ---
+  issuerType         IssuerType
+  /// Pokud issuerType = USER, ID uživatele
+  issuerUserId       String?
+  issuerUser         User?      @relation("IssuedInvoices", fields: [issuerUserId], references: [id])
+  /// Pokud issuerType = EXTERNAL (např. "Stripe Payments Europe, Ltd.")
+  issuerExternalName String?
+
+  issuerName                      String
+  issuerEmail                     String
+  issuerAddressLine1              String?
+  issuerAddressLine2              String?
+  issuerCity                      String?
+  issuerPostalCode                String?
+  issuerCountryCode               String?
+  issuerCountry                   Country? @relation("IssuerInvoices", fields: [issuerCountryCode], references: [code])
+  issuerVatId                     String?
+  issuerRegistrationNumber        String?
+  issuerPhoneNumber               String?
+  issuerBankName                  String?
+  issuerBankAccountNumber         String?
+  issuerBankIban                  String?
+  issuerBankSwift                 String?
+  issuerIsVatPayerAtIssueTime     Boolean
+  issuerVatExemptionReasonAtIssue String?
+
+  // --- Odběratel (Customer) ---
+  // Může být User (pokud Flixy fakturuje uživateli, nebo User fakturuje Flixy)
+  // nebo jen sada údajů pro ad-hoc faktury / koncové zákazníky Store
+
+  /// Pokud je odběratel registrovaný User ve flixy
+  customerUserId  String?
+  customerUser    User?          @relation("ReceivedInvoices", fields: [customerUserId], references: [id])
+  storeCustomerId String?
+  storeCustomer   StoreCustomer? @relation(fields: [storeCustomerId], references: [id])
+
+  customerName                  String
+  customerEmail                 String
+  customerAddressLine1          String?
+  customerAddressLine2          String?
+  customerCity                  String?
+  customerPostalCode            String?
+  customerCountryCode           String?
+  customerCountry               Country? @relation("CustomerInvoices", fields: [customerCountryCode], references: [code])
+  customerVatId                 String?
+  customerRegistrationNumber    String?
+  customerIsBusinessAtIssueTime Boolean
+
+  // --- Finanční údaje ---
+  currencyCode   String
+  currency       Currency @relation(fields: [currencyCode], references: [code])
+  /// Celková částka bez DPH
+  totalNetAmount Int
+  /// Celková DPH
+  totalTaxAmount Int
+  /// Celková částka s DPH (net + tax)
+  totalAmount    Int
+
+  /// Pokud je faktura v cizí měně vůči měně vystavovatele
+  exchangeRateToBaseCurrency Float?
+  /// Měna vystavovatele
+  baseCurrencyCode           String?
+
+  // --- DPH a Daňový režim ---
+  // [{ rate: 21.00, netAmount: 1000.00, taxAmount: 210.00, classification: STANDARD }]
+  /// [InvoiceV2TaxSummary_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2TaxSummary
+  taxSummary Json[]
+
+  taxScheme                 TaxScheme  @default(DOMESTIC)
+  ossDestinationCountryCode String?
+  ossDestinationCountry     Country?   @relation("OSSDestinationInvoices", fields: [ossDestinationCountryCode], references: [code])
+  viesCheckId               String?
+  viesCheck                 ViesCheck? @relation(fields: [viesCheckId], references: [id])
+
+  // --- Odkazy a Metadata ---
+  sourceEntityType SourceEntityType?
+  /// ID původní entity (např. Stripe Invoice ID, StoreOrder ID)
+  sourceEntityId   String?
+
+  correctsInvoiceId  String?    @unique
+  correctionReason   String?
+  correctedByInvoice InvoiceV2? @relation("CorrectingInvoiceRelationship")
+  correctingInvoice  InvoiceV2? @relation("CorrectingInvoiceRelationship", fields: [correctsInvoiceId], references: [id], onDelete: Cascade)
+
+  pdfGeneratedUrl   String?
+  isdocGeneratedUrl String?
+
+  /// Např. "FAKTUROID"
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2ExternalInvoiceProvider
+  externalInvoiceProvider     String?
+  /// ID faktury v externím systému
+  externalInvoiceId           String?
+  /// Další data z externího systému
+  /// [InvoiceV2ExternalInvoiceData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2ExternalInvoiceData
+  externalInvoiceData         Json?
+  paymentGatewayTransactionId String? @unique
+
+  internalNotes    String?
+  /// Kdo/co vytvořilo fakturu (např. system_webhook_stripe, user_action_refund, , worker_adhoc_generation)
+  createdBySource  String?
+  /// Uživatel, který inicioval akci (pokud relevantní)
+  initatedByUserId String?
+
+  // --- Šablony a specifická data ---
+  // Může obsahovat např. specifické texty pro patičku, hlavičku daného typu faktury,
+  // nebo ID šablony PDF/ISDOC, pokud jich bude více
+  /// [InvoiceV2TemplateOverrideData_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2TemplateOverrideData
+  templateOverrideData Json?
+  footerNote           String?
+  taxNotes             String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems InvoiceV2LineItem[]
+
+  @@unique([invoiceNumber, issuerType, issuerUserId, issuerExternalName])
+  @@index([issuerType, issuerUserId, issueDate])
+  @@index([customerUserId, issueDate])
+  @@index([status, type])
+  @@index([sourceEntityType, sourceEntityId])
+  // Zajištění unikátnosti čísla faktury v kontextu vystavovatele
+  @@index([correctsInvoiceId])
+}
+
+model InvoiceV2LineItem {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  invoiceId String
+  invoice   InvoiceV2 @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description    String
+  storeProductId String?
+  storeProduct   StoreProduct? @relation(fields: [storeProductId], references: [id])
+  productSku     String?
+
+  quantity Int
+  unit     String?
+
+  /// Jednotková cena bez DPH
+  unitPriceNetAmount Int
+
+  /// Jednotková cena s DPH
+  unitPriceGrossAmount Int
+
+  /// DPH z jednotkové ceny
+  unitPriceTaxAmount Int
+
+  /// Celková cena řádku bez DPH (quantity * unitPriceNetAmount)
+  totalNetAmount   Int
+  /// Celková DPH řádku
+  totalTaxAmount   Int
+  /// Celková cena řádku s DPH (quantity * unitPriceGrossAmount)
+  totalGrossAmount Int
+
+  //{} Sazba DPH v % (např. 21)
+  taxRatePercentage Int
+  taxClassification TaxClassification @default(STANDARD)
+  // Pokud je pro tuto položku specifický daňový režim
+  lineItemTaxScheme TaxScheme?
+
+  sortOrder Int @default(0)
+
+  /// Specifická data pro položku, která se nevejdou jinam
+  /// (např. reference na původní objednávkovou položku, speciální poznámky k položce)
+  /// [InvoiceV2LineItemMetadata_]
+  /// drizzle.type @flixydev/flixy-types/prisma::InvoiceV2LineItemMetadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+}
+
+// Tabulka pro DEFINICE číselných řad. Každý záznam je unikátní formát.
+// Uživatel si může vytvořit kolik chce definic.
+model InvoiceNumberSeriesDefinition {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Kdo vlastní tuto definici (pro uživatelské řady)
+  /// Pro systémové řady (Flixy) může být null
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+  /// Formát čísla faktury, např.: "F{YYYY}-{NNNNN}"
+  formatString String
+
+  /// Popis řady, např. "Faktury za prodejní objednávky"
+  description String?
+
+  /// Relace na periodické sekvence
+  sequences InvoiceNumberSeriesSequence[]
+
+  /// Relace na přiřazení
+  assignments InvoiceNumberSeriesAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Unikátnost je dána kombinaci vlastníka  a formátu, aby neměl stejný formát 2x
+  @@unique([ownerUserId, formatString])
+}
+
+// Tabulka pro PŘIŘAZENÍ definice k určitému účelu (kontextu).
+// Toto je "aktivní" nastavení uživatele.
+model InvoiceNumberSeriesAssignment {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  /// Účel, například "STORE_SALE", "REFERRAL_PAYOUT"
+  baseContextKey String
+
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+  /// Která definice je pro tento účel a vlastníka aktivní
+  seriesDefinitionId String
+  seriesDefinition   InvoiceNumberSeriesDefinition @relation(fields: [seriesDefinitionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Každý vlastník může mít jen jedno přiřazení pro daný kontext.
+  // Toto je náš "master" záznam.
+  @@unique([baseContextKey, ownerUserId])
+}
+
+/// Tabulka pro PERIODICKÉ SEKVENČNÍ ČÍSLA (např. roční)
+model InvoiceNumberSeriesSequence {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  seriesDefinitionId String
+  seriesDefinition   InvoiceNumberSeriesDefinition @relation(fields: [seriesDefinitionId], references: [id], onDelete: Cascade)
+
+  /// Identifikátor periody, pro kterou platí tato sekvence.
+  /// Pro roční reset to bude rok (např. 2024)
+  /// Pro kontinuální řady to může být speciální hodnota (např. 0 nebo "CONTINUOUS")
+  periodIdentifier String
+
+  /// Poslední použité sekvenční číslo pro tuto definici a periodu
+  lastSequenceNumber Int
+
+  updatedAt DateTime @default(now())
+
+  /// Pro každou definici a periodu existuje jen jedna sekvence
+  @@unique([seriesDefinitionId, periodIdentifier])
+}
+
+// model InvoiceCounterV2 {
+//     // Kontext pro číselnou řadu, např.:
+//     // "FLIXY_ISSUER_FLIXY_SUBSCRIPTION"
+//     // "USER_ISSUER_usr_xxxx_STORE_SALE"
+//     // "USER_ISSUER_usr_xxxx_REFERRAL_PAYOUT"
+//     // Rok bude součástí tohoto klíče pro roční reset, např. "FLIXY_ISSUER_FLIXY_SUBSCRIPTION_2024"
+//     contextKey String @id
+
+//     /// Formát čísla faktury, např.:
+//     /// "F{YYYY}-{NNNNN}" -> F2024-00001
+//     /// "{YYYY}{MM}{DD}-{NNN}" -> 20240522-001
+//     /// "INV-{YYYY}/{NN}" -> INV-2024/01
+//     /// Proměnné:
+//     /// {YYYY} - Rok 4 čísla
+//     /// {YY} - Rok 2 čísla
+//     /// {MM} - měsíc
+//     /// {DD} - Den
+//     /// {N...N} - Sekvence, počet N = padding
+//     formatString String
+
+//     /// Poslední použité sekvenční číslo pro daný contextKey (a tedy i rok)
+//     lastSequenceNumber Int
+
+//     // Doplňující informace o číselné řadě
+//     // Např. "Faktury za předplatné flixy", "Prodejní faktury obchodu MůjSuperObchod"
+//     description String?
+//     // Pokud číselnou řadu definuje uživatel
+//     ownerUserId String?
+//     ownerUser   User?   @relation(fields: [ownerUserId], references: [id])
+
+//     updatedAt DateTime @default(now())
+
+//     @@index([ownerUserId])
+// }
+
+// ===== From subscription.prisma =====
+// #region Subscription Models
+enum SubscriptionV2Model {
+  FLAT_RATE
+  PER_SEAT
+  USAGE_BASED
+  FLAT_RATE_USAGE_BASED
+  ONCE
+}
+
+model SubscriptionV2Product {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                          String              @id @default(cuid())
+  stripeId                    String
+  order                       Int
+  title                       String
+  active                      Boolean
+  model                       SubscriptionV2Model
+  public                      Boolean
+  description                 String?
+  badge                       String?
+  /// If subscription product is legacy, user cannot renew the legacy subscription
+  /// and has to choose a different one
+  isLegacy                    Boolean             @default(false)
+  isBeta                      Boolean             @default(false)
+  migrationFromLegacyProducts Product[]
+
+  prices                   SubscriptionV2Price[]
+  features                 SubscriptionV2Feature[]
+  usageBasedPrices         SubscriptionV2UsageBasedPrice[]
+  userSubscriptionProducts UserSubscriptionProductV2[]
+  appConfiguration         AppConfiguration?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum SubscriptionV2PriceType {
+  ONE_TIME
+  RECURRING
+}
+
+enum SubscriptionV2PriceBillingPeriod {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+  QUARTERLY
+  SEMI_ANNUAL
+}
+
+model SubscriptionV2Price {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String                           @id @default(cuid())
+  stripeId      String
+  type          SubscriptionV2PriceType
+  billingPeriod SubscriptionV2PriceBillingPeriod
+  price         Int
+  trialDays     Int
+  active        Boolean
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  migratedFromSubscriptionProduct ProductPricing[]
+
+  currencyCode String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+
+  userProductPrices UserSubscriptionV2ProductPrice[]
+  downgrades        UserSubscriptionProductV2[]
+
+  appConfigurationAfterSignup              AppConfiguration? @relation(name: "afterSignupSubscriptionPrice")
+  appConfigurationFreeSubProfitAccelerator AppConfiguration? @relation(name: "profitAcceleratorFreeSubscriptionPrice")
+  createdAt                                DateTime          @default(now())
+  updatedAt                                DateTime          @default(now()) @updatedAt
+}
+
+enum SubscriptionV2FeatureLimitType {
+  NOT_INCLUDED
+  INCLUDED
+  MONTHLY
+  MAX
+  UNLIMITED
+  FIXED
+}
+
+enum SubscriptionV2FeatureValueType {
+  NUMBER
+  PERCENTAGE
+}
+
+model SubscriptionV2Feature {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id         String                         @id @default(cuid())
+  order      Int
+  title      String?
+  name       String?
+  type       SubscriptionV2FeatureLimitType
+  value      Int
+  valueType  SubscriptionV2FeatureValueType @default(NUMBER)
+  href       String?
+  badge      String?
+  accumulate Boolean                        @default(false)
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // One subscription product cannot have multiple features with the same name
+  @@unique([subscriptionProductId, name])
+}
+
+model SubscriptionV2UsageBasedPrice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                String                           @id @default(cuid())
+  stripeId          String
+  billingPeriod     Int
+  unit              String
+  unitTitle         String
+  unitTitlePlural   String
+  usageType         String
+  aggregateUsage    String
+  tiersMode         String
+  billingScheme     String
+  tiers             SubscriptionV2UsageBasedTier[]
+  userProductPrices UserSubscriptionV2ProductPrice[]
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  currencyCode String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model SubscriptionV2UsageBasedTier {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id           String @id @default(cuid())
+  from         Int
+  to           Int?
+  perUnitPrice Int?
+  flatFeePrice Int?
+
+  subscriptionUsageBasedPriceId String
+  subscriptionUsageBasedPrice   SubscriptionV2UsageBasedPrice @relation(fields: [subscriptionUsageBasedPriceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// #endregion
+
+// #region User Subscriptions
+
+model UserSubscriptionProductV2 {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  cancelledAt                     DateTime?
+  stripeSubscriptionId            String?              @unique
+  /// drizzle.type @flixydev/flixy-types/prisma::SubscriptionV2Status
+  status                          String
+  quantity                        Int?
+  currentPeriodStart              DateTime
+  currentPeriodEnd                DateTime
+  failedPaymentNotificationSentAt DateTime?
+  downgradeToPrice                SubscriptionV2Price? @relation(fields: [downgradeToPriceId], references: [id])
+  downgradeToPriceId              String?
+  invoices                        UserInvoice[]
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id])
+
+  prices UserSubscriptionV2ProductPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([userId, currentPeriodStart(sort: Desc)])
+}
+
+model UserSubscriptionV2ProductPrice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  userSubscriptionProductId String
+  userSubscriptionProduct   UserSubscriptionProductV2 @relation(fields: [userSubscriptionProductId], references: [id])
+
+  priceId String
+  price   SubscriptionV2Price @relation(fields: [priceId], references: [id])
+
+  subscriptionUsageBasedPriceId String?
+  subscriptionUsageBasedPrice   SubscriptionV2UsageBasedPrice? @relation(fields: [subscriptionUsageBasedPriceId], references: [id])
+
+  usageRecords UserSubscriptionV2UsageRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userSubscriptionProductId, priceId])
+}
+
+model UserSubscriptionV2UsageRecord {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  timestamp Int
+  quantity  Int
+
+  userSubscriptionProductPriceId String
+  userSubscriptionProductPrice   UserSubscriptionV2ProductPrice @relation(fields: [userSubscriptionProductPriceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// #endregion

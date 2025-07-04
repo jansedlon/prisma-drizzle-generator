@@ -1,9 +1,14 @@
-import { logger } from "@prisma/internals";
 import type {
   DatabaseAdapter,
   DrizzleEnum,
   GeneratorConfig,
 } from "../types/index.js";
+
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 
 export class EnumsGenerator {
   constructor(

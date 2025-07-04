@@ -1,4 +1,8 @@
-import { logger } from "@prisma/internals";
+// Simple logger fallback
+const logger = {
+  info: (msg: string) => console.log(`prisma:info ${msg}`),
+  warn: (msg: string) => console.warn(`prisma:warn ${msg}`),
+};
 import type {
   DatabaseAdapter,
   DrizzleTable,
