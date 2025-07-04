@@ -38,10 +38,8 @@ export class SchemaGenerator {
     
     if (needsSql) imports.add('sql');
 
-    // Check if we need defaultNow import for @default(now())
-    const needsDefaultNow = table.columns.some(col => col.defaultValue?.includes('defaultNow()'));
-    
-    if (needsDefaultNow) imports.add('defaultNow');
+    // Note: defaultNow and $onUpdate are column builder methods, not imports
+    // They don't need to be imported
 
     // Check if we need compound constraint imports
     if (table.compoundPrimaryKey) {
@@ -65,11 +63,6 @@ export class SchemaGenerator {
       }
     }
 
-    // Check if we need $onUpdate for @updatedAt fields
-    const needsOnUpdate = table.columns.some(col => col.isUpdatedAt);
-    
-    if (needsOnUpdate) imports.add('$onUpdate');
-
     // Note: pgEnum will be added if needed when enums are present
     // No need to explicitly add it here as it may cause duplicates
 
@@ -78,7 +71,7 @@ export class SchemaGenerator {
 
     // Add enum imports if needed
     if (table.enums.length > 0) {
-      importStatement += `\nimport { ${table.enums.map((e) => `${this.toSnakeCase(e.name)}Enum`).join(", ")} } from './enums.js';`;
+      importStatement += `\nimport { ${table.enums.map((e) => `${this.toCamelCase(e.name)}Enum`).join(", ")} } from './enums.js';`;
     }
 
     return importStatement;

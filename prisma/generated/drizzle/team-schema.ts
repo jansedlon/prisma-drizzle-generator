@@ -1,4 +1,4 @@
-import { text, boolean, timestamp, pgTable, defaultNow, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, boolean, timestamp, pgTable } from 'drizzle-orm/pg-core';
 
 export const team = pgTable('teams', {
   id: text('id').primaryKey(),
@@ -6,6 +6,6 @@ export const team = pgTable('teams', {
   slug: text('slug').unique().notNull(),
   description: text('description'),
   isActive: boolean('isActive').notNull().default(true),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date())
 });

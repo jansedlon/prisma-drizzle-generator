@@ -39,7 +39,49 @@
   - `unique().on(table.userId, table.postId)` ✅
   - `primaryKey({ columns: [table.eventId, table.userId] })` ✅
 
+### **CRITICAL FIXES APPLIED - ROUND 2** 🚨
+
+**User Report**: 5 kritických chyb v implementaci
+
+**Fixed Issues:**
+- ✅ **FIXED: defaultNow/⁣$onUpdate imports** - Removed from imports, they are column builder methods
+  - Before: `import { defaultNow, $onUpdate } from 'drizzle-orm/pg-core'` ❌
+  - After: No import, using `.defaultNow()` and `.$onUpdate()` directly ✅
+
+- ✅ **FIXED: Enum naming** - Now uses camelCase for exports, snake_case for DB:
+  - Before: `user_roleEnum` ❌
+  - After: `userRoleEnum = pgEnum('user_role', [...])` ✅
+
+- ✅ **FIXED: Default value syntax** - Now uses proper column builder methods:
+  - Before: `.default(defaultNow())` ❌  
+  - After: `.defaultNow()` ✅
+
+- ✅ **FIXED: Date/Time types** - Correct properties according to Drizzle docs:
+  - `date('field', { mode: "date" })` - no withTimezone ✅
+  - `time('field', { withTimezone: true })` - no mode ✅
+
+- ✅ **FIXED: onDelete properties** - Removed from relations as they don't exist in Drizzle
+
+**⚠️ REMAINING ISSUES FOUND:**
+- ❌ **Relations duplicates** - `userReferrals` appears twice (one + many)
+- ❌ **Poor relation naming** - `postToUsers` instead of logical `posts`
+
+### **CURRENT STATUS:**
+
+**✅ WORKING CORRECTLY:**
+- Import management (no defaultNow/⁣$onUpdate imports)
+- Enum naming (camelCase exports)
+- Default value syntax (`.defaultNow()`)
+- Date/Time type properties
+- Constraint syntax with callback functions
+- onDelete removal from relations
+
+**⚠️ NEEDS IMPROVEMENT:**
+- Relations naming and duplicate prevention
+
 ---
+
+*Major syntax issues resolved, minor relation improvements needed*
 
 ## 🚨 CRITICAL ISSUES DISCOVERED
 

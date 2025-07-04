@@ -7,9 +7,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   projectToTeams: many(project),
   projectToTeam: one(team, {
     fields: [project.teamId],
-    references: [team.id],
-    onDelete: 'setNull',
-    
+    references: [team.id]
   }),
   projectToTasks: many(task)
 }));

@@ -165,7 +165,7 @@ export class SchemaParser {
       };
     } else if (isEnum) {
       columnType = {
-        drizzleType: `${this.toSnakeCase(field.type)}Enum`,
+        drizzleType: `${this.toCamelCase(field.type)}Enum`,
         importPath: "./enums.js",
       };
     } else {
@@ -230,7 +230,7 @@ export class SchemaParser {
         case "autoincrement":
           return undefined; // Handle with serial type
         case "now":
-          return "defaultNow()";
+          return "defaultNow";
         case "uuid":
           return undefined; // No direct equivalent in Drizzle
         case "cuid":
@@ -344,6 +344,10 @@ export class SchemaParser {
       default:
         return undefined;
     }
+  }
+
+  private toCamelCase(str: string): string {
+    return str.charAt(0).toLowerCase() + str.slice(1);
   }
 
   private toSnakeCase(str: string): string {

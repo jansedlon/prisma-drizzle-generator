@@ -1,4 +1,4 @@
-import { text, boolean, jsonb, timestamp, pgTable, defaultNow, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, boolean, jsonb, timestamp, pgTable } from 'drizzle-orm/pg-core';
 
 export const userSettings = pgTable('user_settings', {
   id: text('id').primaryKey(),
@@ -9,6 +9,6 @@ export const userSettings = pgTable('user_settings', {
   language: text('language').notNull().default('en'),
   timezone: text('timezone').notNull().default('UTC'),
   preferences: jsonb('preferences'),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date())
 });

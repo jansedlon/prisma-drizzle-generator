@@ -1,4 +1,4 @@
-import { text, timestamp, pgTable, defaultNow, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, timestamp, pgTable } from 'drizzle-orm/pg-core';
 import { statusEnum, priorityEnum } from './enums.js';
 
 export const task = pgTable('tasks', {
@@ -11,6 +11,6 @@ export const task = pgTable('tasks', {
   assigneeId: text('assigneeId'),
   dueDate: timestamp('dueDate', { withTimezone: true, mode: "date" }),
   completedAt: timestamp('completedAt', { withTimezone: true, mode: "date" }),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date())
 });

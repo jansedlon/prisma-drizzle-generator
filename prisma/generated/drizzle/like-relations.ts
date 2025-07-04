@@ -10,20 +10,14 @@ export const likeRelations = relations(like, ({ one, many }) => ({
   commentToLikes: many(like),
   likeToUser: one(user, {
     fields: [like.userId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   }),
   likeToPost: one(post, {
     fields: [like.postId],
-    references: [post.id],
-    onDelete: 'cascade',
-    
+    references: [post.id]
   }),
   commentToLike: one(comment, {
     fields: [like.commentId],
-    references: [comment.id],
-    onDelete: 'cascade',
-    
+    references: [comment.id]
   })
 }));

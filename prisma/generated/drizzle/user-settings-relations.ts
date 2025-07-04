@@ -5,8 +5,6 @@ import { user } from './user-schema.js';
 export const userSettingsRelations = relations(userSettings, ({ one, many }) => ({
   userToUserSettings: one(user, {
     fields: [userSettings.userId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   })
 }));

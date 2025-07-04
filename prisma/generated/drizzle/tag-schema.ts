@@ -1,4 +1,4 @@
-import { text, timestamp, pgTable, defaultNow, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, timestamp, pgTable } from 'drizzle-orm/pg-core';
 
 export const tag = pgTable('tags', {
   id: text('id').primaryKey(),
@@ -6,6 +6,6 @@ export const tag = pgTable('tags', {
   slug: text('slug').unique().notNull(),
   color: text('color'),
   description: text('description'),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date())
 });

@@ -8,14 +8,10 @@ export const teamMemberRelations = relations(teamMember, ({ one, many }) => ({
   teamToTeamMembers: many(teamMember),
   teamToTeamMember: one(team, {
     fields: [teamMember.teamId],
-    references: [team.id],
-    onDelete: 'cascade',
-    
+    references: [team.id]
   }),
   teamMemberToUser: one(user, {
     fields: [teamMember.userId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   })
 }));

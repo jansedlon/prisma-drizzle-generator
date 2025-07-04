@@ -10,15 +10,11 @@ export const postRelations = relations(post, ({ one, many }) => ({
   categoryToPosts: many(post),
   postToUser: one(user, {
     fields: [post.authorId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   }),
   categoryToPost: one(category, {
     fields: [post.categoryId],
-    references: [category.id],
-    onDelete: 'setNull',
-    
+    references: [category.id]
   }),
   commentToPosts: many(comment),
   likeToPosts: many(like)

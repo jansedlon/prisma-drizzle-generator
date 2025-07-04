@@ -127,9 +127,7 @@ export class RelationsGenerator {
 
           return `  ${relationFieldName}: ${relationType}(${referencedTableCamelCase}, {
     fields: [${this.toCamelCase(table.name)}.${rel.foreignKeyField}],
-    references: [${referencedTableCamelCase}.${rel.referencedField}],
-    ${rel.onDelete ? `onDelete: '${rel.onDelete}',` : ""}
-    ${rel.onUpdate ? `onUpdate: '${rel.onUpdate}',` : ""}
+    references: [${referencedTableCamelCase}.${rel.referencedField}]
   })`;
         } else {
           // type === 'many'
@@ -202,9 +200,7 @@ ${relationItems}
 
             return `  ${relationFieldName}: ${relationType}(${referencedTableCamelCase}, {
     fields: [${this.toCamelCase(table.name)}.${rel.foreignKeyField}],
-    references: [${referencedTableCamelCase}.${rel.referencedField}],
-    ${rel.onDelete ? `onDelete: '${rel.onDelete}',` : ""}
-    ${rel.onUpdate ? `onUpdate: '${rel.onUpdate}',` : ""}
+    references: [${referencedTableCamelCase}.${rel.referencedField}]
   })`;
           } else {
             // type === 'many'

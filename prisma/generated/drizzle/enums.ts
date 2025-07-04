@@ -4,4 +4,4 @@ export const statusEnum = pgEnum('status', ['ACTIVE', 'INACTIVE', 'PENDING', 'SU
 
 export const priorityEnum = pgEnum('priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
-export const user_roleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'USER', 'GUEST']);
+export const userRoleEnum = pgEnum('user_role', ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'USER', 'GUEST']);

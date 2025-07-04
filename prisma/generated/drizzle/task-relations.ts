@@ -8,14 +8,10 @@ export const taskRelations = relations(task, ({ one, many }) => ({
   projectToTasks: many(task),
   projectToTask: one(project, {
     fields: [task.projectId],
-    references: [project.id],
-    onDelete: 'cascade',
-    
+    references: [project.id]
   }),
   taskToUser: one(user, {
     fields: [task.assigneeId],
-    references: [user.id],
-    onDelete: 'setNull',
-    
+    references: [user.id]
   })
 }));

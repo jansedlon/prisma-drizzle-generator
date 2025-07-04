@@ -1,4 +1,4 @@
-import { text, timestamp, varchar, jsonb, pgTable, defaultNow, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, timestamp, varchar, jsonb, pgTable } from 'drizzle-orm/pg-core';
 
 export const userProfile = pgTable('user_profiles', {
   id: text('id').primaryKey(),
@@ -11,6 +11,6 @@ export const userProfile = pgTable('user_profiles', {
   longBio: text('longBio'),
   shortBio: varchar('shortBio', { length: 500 }),
   metadata: jsonb('metadata'),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date())
 });

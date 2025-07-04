@@ -1,4 +1,4 @@
-import { text, varchar, char, integer, bigint, real, decimal, smallint, doublePrecision, boolean, timestamp, date, time, jsonb, pgTable, defaultNow, unique, $onUpdate } from 'drizzle-orm/pg-core';
+import { text, varchar, char, integer, bigint, real, decimal, smallint, doublePrecision, boolean, timestamp, date, time, jsonb, pgTable, unique } from 'drizzle-orm/pg-core';
 import { statusEnum, priorityEnum } from './enums.js';
 
 export const basicTypes = pgTable('basic_types', {
@@ -27,7 +27,7 @@ export const basicTypes = pgTable('basic_types', {
   defaultBool: boolean('defaultBool').notNull().default(true),
   dateTime: timestamp('dateTime', { withTimezone: true, mode: "date" }).notNull(),
   optionalDate: timestamp('optionalDate', { withTimezone: true, mode: "date" }),
-  defaultNow: timestamp('defaultNow', { withTimezone: true, mode: "date" }).notNull().default(defaultNow()),
+  defaultNow: timestamp('defaultNow', { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: "date" }).notNull().$onUpdate(() => new Date()),
   dateField: date('dateField', { mode: "date" }).notNull(),
   timeField: time('timeField', { withTimezone: true }).notNull(),
@@ -43,7 +43,7 @@ export const basicTypes = pgTable('basic_types', {
   customVarchar: text('customVarchar').notNull(),
   customDefault: text('customDefault').notNull().default('original'),
   uuidField: text('uuidField').notNull(),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow())
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow()
 }, (table) => [
   unique('text_int_unique').on(table.text, table.intField)
 ]);

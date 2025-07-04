@@ -11,9 +11,7 @@ import { friendship } from './friendship-schema.js';
 export const userRelations = relations(user, ({ one, many }) => ({
   userReferrals: one(user, {
     fields: [user.referredById],
-    references: [user.id],
-    
-    
+    references: [user.id]
   }),
   userReferrals: many(user),
   postToUsers: many(post),

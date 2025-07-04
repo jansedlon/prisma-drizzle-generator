@@ -5,9 +5,7 @@ import { post } from './post-schema.js';
 export const categoryRelations = relations(category, ({ one, many }) => ({
   categoryHierarchy: one(category, {
     fields: [category.parentId],
-    references: [category.id],
-    
-    
+    references: [category.id]
   }),
   categoryHierarchys: many(category),
   categoryToPosts: many(post)

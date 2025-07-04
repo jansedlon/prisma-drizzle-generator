@@ -225,7 +225,12 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
 
     // Only add regular default if no custom default was applied
     if (column.defaultValue && !hasCustomDefault) {
-      modifiers.push(`default(${column.defaultValue})`);
+      // Handle special column builder methods
+      if (column.defaultValue === "defaultNow") {
+        modifiers.push("defaultNow()");
+      } else {
+        modifiers.push(`default(${column.defaultValue})`);
+      }
     }
 
     if (modifiers.length > 0) {

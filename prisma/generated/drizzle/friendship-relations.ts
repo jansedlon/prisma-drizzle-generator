@@ -7,14 +7,10 @@ export const friendshipRelations = relations(friendship, ({ one, many }) => ({
   friendOfUsers: many(friendship),
   userFriends: one(user, {
     fields: [friendship.userId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   }),
   friendOfUser: one(user, {
     fields: [friendship.friendId],
-    references: [user.id],
-    onDelete: 'cascade',
-    
+    references: [user.id]
   })
 }));

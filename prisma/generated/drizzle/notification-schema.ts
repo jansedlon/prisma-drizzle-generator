@@ -1,4 +1,4 @@
-import { text, boolean, jsonb, timestamp, pgTable, defaultNow } from 'drizzle-orm/pg-core';
+import { text, boolean, jsonb, timestamp, pgTable } from 'drizzle-orm/pg-core';
 
 export const notification = pgTable('notifications', {
   id: text('id').primaryKey(),
@@ -8,5 +8,5 @@ export const notification = pgTable('notifications', {
   message: text('message'),
   isRead: boolean('isRead').notNull().default(false),
   data: jsonb('data'),
-  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().default(defaultNow())
+  createdAt: timestamp('createdAt', { withTimezone: true, mode: "date" }).notNull().defaultNow()
 });
