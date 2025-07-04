@@ -1,0 +1,53 @@
+{
+  "name": "prisma-drizzle-generator",
+  "version": "1.0.0",
+  "description": "A Prisma generator that creates Drizzle ORM schema from Prisma schema",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "prisma-drizzle-generator": "dist/index.cjs"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "bun --hot src/index.ts",
+    "test": "bun test",
+    "test:unit": "bun test test/unit",
+    "test:e2e": "bun test/e2e/index.ts",
+    "test:e2e:verbose": "bun test/e2e/index.ts --verbose",
+    "test:e2e:no-docker": "bun --inspect-brk test/e2e/index.ts --skip-docker",
+    "test:all": "bun run test:unit && bun run test:e2e",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "generate": "bun run build && bun run prisma generate",
+    "generate:watch": "bun run ./generate-watch.ts"
+  },
+  "dependencies": {
+    "@effect/platform": "^0.87.5",
+    "@effect/platform-bun": "^0.72.9",
+    "@prisma/client": "^6.11.1",
+    "@prisma/generator-helper": "^6.11.1",
+    "@prisma/sdk": "^4.0.0",
+    "drizzle-orm": "^0.44.2",
+    "effect": "^3.16.11"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.6",
+    "@types/bun": "latest",
+    "@types/node": "^24.0.10",
+    "tsdown": "^0.12.9"
+  },
+  "peerDependencies": {
+    "prisma": "^6.11.1",
+    "typescript": "^5"
+  },
+  "keywords": [
+    "prisma",
+    "drizzle",
+    "generator",
+    "orm",
+    "typescript"
+  ],
+  "author": "Jan Sedlon",
+  "license": "MIT"
+}

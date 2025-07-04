@@ -1,0 +1,515 @@
+// Comprehensive test schema covering all Prisma features
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator drizzle {
+  provider = "prisma-drizzle-generator"
+  output   = "./test-output"
+  moduleResolution = "nodeNext"
+  formatter = "biome"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === ENUMS ===
+enum Status {
+  ACTIVE
+  INACTIVE
+  PENDING
+  SUSPENDED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  USER
+  GUEST
+}
+
+// === BASIC TYPES TESTING ===
+model BasicTypes {
+  id            String   @id @default(uuid())
+  
+  // String variations
+  text          String
+  optionalText  String?
+  uniqueText    String   @unique
+  defaultText   String   @default("default value")
+  
+  // Native types testing
+  /// @db.VarChar(255)
+  varcharField  String   @db.VarChar(255)
+  /// @db.Text
+  textField     String   @db.Text
+  /// @db.Char(10)
+  charField     String   @db.Char(10)
+  
+  // Numeric types
+  intField      Int
+  optionalInt   Int?
+  defaultInt    Int      @default(42)
+  bigIntField   BigInt
+  floatField    Float
+  decimalField  Decimal
+  
+  // Native numeric types
+  /// @db.SmallInt
+  smallIntField Int      @db.SmallInt
+  /// @db.Integer
+  integerField  Int      @db.Integer
+  /// @db.BigInt
+  bigintField   BigInt   @db.BigInt
+  /// @db.Real
+  realField     Float    @db.Real
+  /// @db.DoublePrecision
+  doubleField   Float    @db.DoublePrecision
+  /// @db.Decimal(10, 2)
+  preciseDecimal Decimal @db.Decimal(10, 2)
+  /// @db.Money
+  moneyField    Decimal  @db.Money
+  
+  // Boolean
+  boolField     Boolean
+  defaultBool   Boolean  @default(true)
+  
+  // DateTime variations
+  dateTime      DateTime
+  optionalDate  DateTime?
+  defaultNow    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Native datetime types
+  /// @db.Date
+  dateField     DateTime @db.Date
+  /// @db.Time
+  timeField     DateTime @db.Time
+  /// @db.Timestamp
+  timestampField DateTime @db.Timestamp
+  /// @db.Timestamptz
+  timestamptzField DateTime @db.Timestamptz
+  
+  // JSON types
+  jsonField     Json
+  optionalJson  Json?
+  /// @db.JsonB
+  jsonbField    Json     @db.JsonB
+  
+  // Bytes
+  bytesField    Bytes
+  optionalBytes Bytes?
+  
+  // Enum fields
+  status        Status   @default(PENDING)
+  priority      Priority
+  
+  // Custom directives testing
+  /// @drizzle.type(type: "varchar", length: 100)
+  customVarchar String
+  
+  /// @drizzle.default(value: "custom_default")
+  customDefault String   @default("original")
+  
+  /// @drizzle.type(type: "uuid")
+  uuidField     String   @default(uuid())
+  
+  createdAt     DateTime @default(now())
+
+  @@map("basic_types")
+  @@index([status, priority])
+  @@unique([text, intField], name: "text_int_unique")
+}
+
+// === USER SYSTEM (Self-relations, complex relationships) ===
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  username      String     @unique
+  firstName     String?
+  lastName      String?
+  fullName      String?    @default("")
+  role          UserRole   @default(USER)
+  isActive      Boolean    @default(true)
+  lastLoginAt   DateTime?
+  emailVerified Boolean    @default(false)
+  
+  // Self-relation (referral system)
+  referredById  String?
+  referredBy    User?      @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals     User[]     @relation("UserReferrals")
+  
+  // One-to-one relations
+  profile       UserProfile?
+  settings      UserSettings?
+  
+  // One-to-many relations
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  notifications Notification[]
+  assignedTasks Task[]
+  
+  // Many-to-many relations (explicit junction)
+  memberships   TeamMember[]
+  friendships   Friendship[] @relation("UserFriends")
+  friendOf      Friendship[] @relation("FriendOfUser")
+  
+  // Many-to-many implicit
+  followedTags  Tag[]        @relation("UserFollowedTags")
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("users")
+  @@index([email])
+  @@index([username])
+  @@index([role, isActive])
+}
+
+model UserProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  bio       String?
+  avatar    String?
+  website   String?
+  location  String?
+  birthDate DateTime?
+  
+  // Native types for testing
+  /// @db.Text
+  longBio   String?  @db.Text
+  /// @db.VarChar(500)
+  shortBio  String?  @db.VarChar(500)
+  
+  // JSON field for metadata
+  metadata  Json?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model UserSettings {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  theme            String  @default("light")
+  language         String  @default("en")
+  timezone         String  @default("UTC")
+  
+  // JSON settings for flexibility
+  preferences      Json?
+  
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+// === CONTENT SYSTEM ===
+model Category {
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+  parentId    String?
+  
+  // Self-relation for subcategories
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  
+  posts       Post[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("categories")
+  @@index([slug])
+  @@index([parentId])
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  content     String?
+  excerpt     String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  authorId    String
+  categoryId  String?
+  
+  // Native types
+  /// @db.Text
+  longContent String?  @db.Text
+  /// @db.VarChar(160)
+  metaDescription String? @db.VarChar(160)
+  
+  // JSON metadata
+  metadata    Json?
+  
+  // Relations
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments    Comment[]
+  likes       Like[]
+  
+  // Many-to-many with tags
+  tags        Tag[]     @relation("PostTags")
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("posts")
+  @@index([slug])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([published, publishedAt])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  content   String
+  postId    String
+  authorId  String
+  parentId  String?
+  isDeleted Boolean   @default(false)
+  
+  // Self-relation for replies
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  
+  // Relations
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes     Like[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("comments")
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String?
+  commentId String?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@map("likes")
+  @@index([userId])
+  @@index([postId])
+  @@index([commentId])
+}
+
+model Tag {
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  color       String?
+  description String?
+  
+  // Many-to-many relations
+  posts       Post[] @relation("PostTags")
+  followers   User[] @relation("UserFollowedTags")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tags")
+  @@index([slug])
+}
+
+// === TEAM SYSTEM (Explicit many-to-many) ===
+model Team {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  slug        String       @unique
+  description String?
+  isActive    Boolean      @default(true)
+  
+  members     TeamMember[]
+  projects    Project[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("teams")
+  @@index([slug])
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  teamId   String
+  userId   String
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+  
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([teamId, userId])
+  @@map("team_members")
+  @@index([teamId])
+  @@index([userId])
+}
+
+// === PROJECT SYSTEM ===
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      Status   @default(PENDING)
+  priority    Priority @default(MEDIUM)
+  teamId      String?
+  
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  tasks       Task[]
+  
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("projects")
+  @@index([teamId])
+  @@index([status, priority])
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  status      Status    @default(PENDING)
+  priority    Priority  @default(MEDIUM)
+  projectId   String
+  assigneeId  String?
+  
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("tasks")
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status, priority])
+}
+
+// === SOCIAL FEATURES ===
+model Friendship {
+  id         String   @id @default(uuid())
+  userId     String
+  friendId   String
+  status     String   @default("pending") // pending, accepted, rejected, blocked
+  
+  user       User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend     User     @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, friendId])
+  @@map("friendships")
+  @@index([userId])
+  @@index([friendId])
+  @@index([status])
+}
+
+// === NOTIFICATION SYSTEM ===
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String?
+  isRead    Boolean  @default(false)
+  data      Json?    // Additional notification data
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+}
+
+// === EDGE CASES ===
+// Model with only relations (junction table alternative)
+model EventAttendee {
+  eventId String
+  userId  String
+  status  String @default("going")
+  
+  // These would be relations if Event model existed
+  // event   Event @relation(fields: [eventId], references: [id])
+  // user    User  @relation(fields: [userId], references: [id])
+  
+  @@id([eventId, userId])
+  @@map("event_attendees")
+}
+
+// Model with very long names and special characters
+model VeryLongModelNameThatTestsNamingConventionsAndEdgeCases {
+  id                                    String @id @default(uuid())
+  aVeryLongFieldNameThatMightCauseIssues String
+  field_with_underscores                String
+  fieldWithNumbers123                   String
+  
+  @@map("very_long_table_name_for_testing")
+}
+
+// Model with reserved keywords
+model Order {
+  id       String @id @default(uuid())
+  select   String // 'select' is SQL reserved keyword
+  from     String // 'from' is SQL reserved keyword
+  where    String // 'where' is SQL reserved keyword
+  order    Int    // 'order' is SQL reserved keyword
+  group    String // 'group' is SQL reserved keyword
+  
+  @@map("orders")
+}
+
+// Composite primary key testing
+model UserTask {
+  userId String
+  taskId String
+  role   String @default("viewer")
+  
+  @@id([userId, taskId])
+  @@map("user_tasks")
+}
