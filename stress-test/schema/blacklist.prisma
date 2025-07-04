@@ -1,0 +1,13 @@
+model Blacklist {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id               String   @id @default(cuid())
+    /// drizzle.type @flixydev/flixy-types/prisma::BlacklistType
+    type             String
+    value            String
+    active           Boolean  @default(true)
+    registerAttempts Int      @default(0)
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @default(now()) @updatedAt
+
+    @@index([type, value])
+}

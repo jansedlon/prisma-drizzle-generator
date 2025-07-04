@@ -1,0 +1,40 @@
+enum FunnelStatus {
+    DRAFT
+    ACTIVE
+    ARCHIVED
+}
+
+model Funnel {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id            String         @id @default(cuid())
+    name          String
+    storeId       String
+    store         Store          @relation(fields: [storeId], references: [id])
+    entryProducts StoreProduct[]
+    status        FunnelStatus   @default(ACTIVE)
+    steps         FunnelStep[]
+    orders        StoreOrder[]
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @default(now()) @updatedAt
+    deletedAt     DateTime?
+}
+
+model FunnelStep {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id                String       @id @default(cuid())
+    isEntryPoint      Boolean      @default(false)
+    funnelId          String
+    funnel            Funnel       @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+    productId         String       @unique
+    product           StoreProduct @relation(fields: [productId], references: [id])
+    nextStepAcceptId  String?
+    nextStepAccept    FunnelStep?  @relation(fields: [nextStepAcceptId], references: [id], name: "FunnelStepNextStepAccept")
+    nextStepDeclineId String?
+    nextStepDecline   FunnelStep?  @relation(fields: [nextStepDeclineId], references: [id], name: "FunnelStepNextStepDecline")
+    orderPosition     Int          @default(999)
+    previousSteps1    FunnelStep[] @relation("FunnelStepNextStepAccept")
+    previousSteps2    FunnelStep[] @relation("FunnelStepNextStepDecline")
+    createdAt         DateTime     @default(now())
+    updatedAt         DateTime     @default(now()) @updatedAt
+    deletedAt         DateTime?
+}

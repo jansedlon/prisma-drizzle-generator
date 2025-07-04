@@ -1,0 +1,14 @@
+model Event {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    user   User?   @relation(fields: [userId], references: [id])
+    userId String?
+
+    name        String
+    data        Json
+    resource    String?
+    description String?
+
+    createdAt DateTime @default(now())
+}

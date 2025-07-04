@@ -1,0 +1,225 @@
+// #region Subscription Models
+enum SubscriptionV2Model {
+  FLAT_RATE
+  PER_SEAT
+  USAGE_BASED
+  FLAT_RATE_USAGE_BASED
+  ONCE
+}
+
+model SubscriptionV2Product {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                          String              @id @default(cuid())
+  stripeId                    String
+  order                       Int
+  title                       String
+  active                      Boolean
+  model                       SubscriptionV2Model
+  public                      Boolean
+  description                 String?
+  badge                       String?
+  /// If subscription product is legacy, user cannot renew the legacy subscription
+  /// and has to choose a different one
+  isLegacy                    Boolean             @default(false)
+  isBeta                      Boolean             @default(false)
+  migrationFromLegacyProducts Product[]
+
+  prices                   SubscriptionV2Price[]
+  features                 SubscriptionV2Feature[]
+  usageBasedPrices         SubscriptionV2UsageBasedPrice[]
+  userSubscriptionProducts UserSubscriptionProductV2[]
+  appConfiguration         AppConfiguration?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum SubscriptionV2PriceType {
+  ONE_TIME
+  RECURRING
+}
+
+enum SubscriptionV2PriceBillingPeriod {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+  QUARTERLY
+  SEMI_ANNUAL
+}
+
+model SubscriptionV2Price {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id            String                           @id @default(cuid())
+  stripeId      String
+  type          SubscriptionV2PriceType
+  billingPeriod SubscriptionV2PriceBillingPeriod
+  price         Int
+  trialDays     Int
+  active        Boolean
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  migratedFromSubscriptionProduct ProductPricing[]
+
+  currencyCode String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+
+  userProductPrices UserSubscriptionV2ProductPrice[]
+  downgrades        UserSubscriptionProductV2[]
+
+  appConfigurationAfterSignup              AppConfiguration? @relation(name: "afterSignupSubscriptionPrice")
+  appConfigurationFreeSubProfitAccelerator AppConfiguration? @relation(name: "profitAcceleratorFreeSubscriptionPrice")
+  createdAt                                DateTime          @default(now())
+  updatedAt                                DateTime          @default(now()) @updatedAt
+}
+
+enum SubscriptionV2FeatureLimitType {
+  NOT_INCLUDED
+  INCLUDED
+  MONTHLY
+  MAX
+  UNLIMITED
+  FIXED
+}
+
+enum SubscriptionV2FeatureValueType {
+  NUMBER
+  PERCENTAGE
+}
+
+model SubscriptionV2Feature {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id         String                         @id @default(cuid())
+  order      Int
+  title      String?
+  name       String?
+  type       SubscriptionV2FeatureLimitType
+  value      Int
+  valueType  SubscriptionV2FeatureValueType @default(NUMBER)
+  href       String?
+  badge      String?
+  accumulate Boolean                        @default(false)
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // One subscription product cannot have multiple features with the same name
+  @@unique([subscriptionProductId, name])
+}
+
+model SubscriptionV2UsageBasedPrice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id                String                           @id @default(cuid())
+  stripeId          String
+  billingPeriod     Int
+  unit              String
+  unitTitle         String
+  unitTitlePlural   String
+  usageType         String
+  aggregateUsage    String
+  tiersMode         String
+  billingScheme     String
+  tiers             SubscriptionV2UsageBasedTier[]
+  userProductPrices UserSubscriptionV2ProductPrice[]
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id], onDelete: Cascade)
+
+  currencyCode String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model SubscriptionV2UsageBasedTier {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id           String @id @default(cuid())
+  from         Int
+  to           Int?
+  perUnitPrice Int?
+  flatFeePrice Int?
+
+  subscriptionUsageBasedPriceId String
+  subscriptionUsageBasedPrice   SubscriptionV2UsageBasedPrice @relation(fields: [subscriptionUsageBasedPriceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// #endregion
+
+// #region User Subscriptions
+
+model UserSubscriptionProductV2 {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  cancelledAt                     DateTime?
+  stripeSubscriptionId            String?              @unique
+  /// drizzle.type @flixydev/flixy-types/prisma::SubscriptionV2Status
+  status                          String
+  quantity                        Int?
+  currentPeriodStart              DateTime
+  currentPeriodEnd                DateTime
+  failedPaymentNotificationSentAt DateTime?
+  downgradeToPrice                SubscriptionV2Price? @relation(fields: [downgradeToPriceId], references: [id])
+  downgradeToPriceId              String?
+  invoices                        UserInvoice[]
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  subscriptionProductId String
+  subscriptionProduct   SubscriptionV2Product @relation(fields: [subscriptionProductId], references: [id])
+
+  prices UserSubscriptionV2ProductPrice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([userId, currentPeriodStart(sort: Desc)])
+}
+
+model UserSubscriptionV2ProductPrice {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  userSubscriptionProductId String
+  userSubscriptionProduct   UserSubscriptionProductV2 @relation(fields: [userSubscriptionProductId], references: [id])
+
+  priceId String
+  price   SubscriptionV2Price @relation(fields: [priceId], references: [id])
+
+  subscriptionUsageBasedPriceId String?
+  subscriptionUsageBasedPrice   SubscriptionV2UsageBasedPrice? @relation(fields: [subscriptionUsageBasedPriceId], references: [id])
+
+  usageRecords UserSubscriptionV2UsageRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userSubscriptionProductId, priceId])
+}
+
+model UserSubscriptionV2UsageRecord {
+  /// drizzle.default @paralleldrive/cuid2::createId
+  id String @id @default(cuid())
+
+  timestamp Int
+  quantity  Int
+
+  userSubscriptionProductPriceId String
+  userSubscriptionProductPrice   UserSubscriptionV2ProductPrice @relation(fields: [userSubscriptionProductPriceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+// #endregion

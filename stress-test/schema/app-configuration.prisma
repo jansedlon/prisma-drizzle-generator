@@ -1,0 +1,34 @@
+model AppConfiguration {
+    /// drizzle.default @paralleldrive/cuid2::createId
+    id String @id @default(cuid())
+
+    afterSignupSubscriptionPriceId String?              @unique
+    afterSignupSubscriptionPrice   SubscriptionV2Price? @relation(name: "afterSignupSubscriptionPrice", fields: [afterSignupSubscriptionPriceId], references: [id])
+
+    flixyStoreId String? @unique
+    flixyStore   Store?  @relation(fields: [flixyStoreId], references: [id])
+
+    profitAcceleratorProductIds  String[]
+    profitAcceleratorCommunityId String?    @unique
+    profitAcceleratorCommunity   Community? @relation(fields: [profitAcceleratorCommunityId], references: [id])
+
+    profitAcceleratorProPostCategories String[]
+
+    profitAcceleratorProBetaProductId String?                @unique
+    profitAcceleratorProBetaProduct   SubscriptionV2Product? @relation(fields: [profitAcceleratorProBetaProductId], references: [id])
+
+    allowedPricesToUpgradeToProfitAcceleratorPro String[]
+    profitAcceleratorProCourses                  String[]
+
+    // This is the Flixy Pro price that has 0 CZK price because
+    // it's immediately cancelled after purchase and changed to regular Flixy Pro price
+    profitAcceleratorFreeSubscriptionPriceId String?              @unique
+    profitAcceleratorFreeSubscriptionPrice   SubscriptionV2Price? @relation(name: "profitAcceleratorFreeSubscriptionPrice", fields: [profitAcceleratorFreeSubscriptionPriceId], references: [id])
+
+    profitAcceleratorWebinarCourses String[]
+
+    profitAcceleratorCoursesPriceId String? @unique
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+}
